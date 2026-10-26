@@ -13,7 +13,10 @@
     { id: "fireRate", name: "Faster Firing", icon: "➶", description: "Shoot zombies more often.", baseCost: 32, costScale: 1.58 },
     { id: "walls", name: "Reinforced Walls", icon: "▤", description: "More home integrity and stronger repairs.", baseCost: 26, costScale: 1.5 },
     { id: "garden", name: "Garden Traps", icon: "✳", description: "Damage zombies that reach the house.", baseCost: 46, costScale: 1.7 },
-    { id: "income", name: "Supply Shed", icon: "✦", description: "Earn coins even while the game is idle.", baseCost: 30, costScale: 1.6 }
+    { id: "income", name: "Supply Shed", icon: "✦", description: "Earn coins even while the game is idle.", baseCost: 30, costScale: 1.6 },
+    { id: "minigun", name: "Minigun Nest", icon: "⤠", description: "Unlock a rapid-fire turret; upgrades boost damage and speed.", baseCost: 90, costScale: 1.72 },
+    { id: "laser", name: "Laser Array", icon: "⌁", description: "Unlock a piercing laser; upgrades boost damage and recharge speed.", baseCost: 160, costScale: 1.78 },
+    { id: "rockets", name: "Rocket Silo", icon: "➤", description: "Unlock explosive rockets; upgrades boost blast damage.", baseCost: 240, costScale: 1.82 }
   ];
   const freshSave = () => ({
     coins: 40,
@@ -27,6 +30,9 @@
     walls: 0,
     garden: 0,
     income: 0,
+    minigun: 0,
+    laser: 0,
+    rockets: 0,
     health: 250,
     savedAt: Date.now()
   });
@@ -39,6 +45,9 @@
   let trees = [];
   let spawnTimer = 1.5;
   let shotTimer = 0;
+  let minigunTimer = 0;
+  let laserTimer = 0;
+  let rocketTimer = 0;
   let gameState = save.health > 0 ? "playing" : "defeated";
   let lastTime = 0;
   let saveTimer = 0;
@@ -179,11 +188,53 @@
 
     save.coins += save.income * 0.12 * dt;
     shotTimer -= dt;
+    minigunTimer -= dt;
+    laserTimer -= dt;
+    rocketTimer -= dt;
     const target = findTarget();
     if (target && shotTimer <= 0) {
-      bullets.push({ x: center.x, y: center.y - 13, target, speed: 390, damage: damagePerShot(), life: 2 });
+      bullets.push({ x: center.x, y: center.y - 13, target, speed: 390, damage: damagePerShot(), life: 2, weapon: "house" });
       shotTimer = fireInterval();
       playTone(430, 0.035);
+    }
+    if (target && save.minigun > 0 && minigunTimer <= 0) {
+      bullets.push({
+        x: center.x + 22, y: center.y + 5, target,
+        speed: 540, damage: 3 + save.minigun * 2, life: 2, weapon: "minigun"
+      });
+      minigunTimer = Math.max(0.075, 0.24 - save.minigun * 0.025);
+    }
+    if (target && save.laser > 0 && laserTimer <= 0) {
+      const laserDamage = 17 + save.laser * 12;
+      const beamX = center.x - 20;
+      const beamY = center.y - 10;
+      const beamDx = target.x - beamX;
+      const beamDy = target.y - beamY;
+      const beamLength = beamDx * beamDx + beamDy * beamDy;
+      for (const zombie of zombies) {
+        if (zombie.dead) continue;
+        const projection = Math.max(0, Math.min(1, ((zombie.x - beamX) * beamDx + (zombie.y - beamY) * beamDy) / beamLength));
+        const closestX = beamX + projection * beamDx;
+        const closestY = beamY + projection * beamDy;
+        if (Math.hypot(zombie.x - closestX, zombie.y - closestY) <= zombie.radius + 7) {
+          damageZombie(zombie, laserDamage);
+        }
+      }
+      effects.push({
+        type: "beam", x1: beamX, y1: beamY, x2: target.x, y2: target.y,
+        color: "#71eaff", life: 0.16, maxLife: 0.16
+      });
+      laserTimer = Math.max(0.38, 1.35 - save.laser * 0.12);
+      playTone(780, 0.055);
+    }
+    if (target && save.rockets > 0 && rocketTimer <= 0) {
+      bullets.push({
+        x: center.x, y: center.y - 24, target,
+        speed: 240, damage: 15 + save.rockets * 12, life: 3,
+        weapon: "rocket", blastRadius: 52 + save.rockets * 3
+      });
+      rocketTimer = Math.max(0.65, 2.1 - save.rockets * 0.13);
+      playTone(190, 0.09);
     }
 
     for (const zombie of zombies) {
@@ -220,10 +271,18 @@
       const dy = bullet.target.y - bullet.y;
       const distance = Math.hypot(dx, dy);
       if (distance < bullet.speed * dt + bullet.target.radius) {
-        bullet.target.hp -= bullet.damage;
         bullet.dead = true;
-        effects.push({ x: bullet.target.x, y: bullet.target.y - 8, text: `-${Math.round(bullet.damage)}`, color: "#f2da9e", life: 0.55, maxLife: 0.55 });
-        if (bullet.target.hp <= 0) killZombie(bullet.target);
+        if (bullet.weapon === "rocket") {
+          detonateRocket(bullet);
+        } else {
+          damageZombie(bullet.target, bullet.damage);
+          effects.push({
+            x: bullet.target.x, y: bullet.target.y - 8,
+            text: `-${Math.round(bullet.damage)}`,
+            color: bullet.weapon === "minigun" ? "#ffd278" : "#f2da9e",
+            life: 0.55, maxLife: 0.55
+          });
+        }
       } else {
         bullet.x += dx / distance * bullet.speed * dt;
         bullet.y += dy / distance * bullet.speed * dt;
@@ -276,6 +335,27 @@
       effects.push({ x: zombie.x, y: zombie.y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, color: ["#b5c771", "#dd9878", "#b58a76"][zombie.tint], life: 0.4 + Math.random() * 0.45, maxLife: 0.8, size: 1.5 + Math.random() * 2 });
     }
     playTone(680, 0.045);
+  }
+
+  function damageZombie(zombie, damage) {
+    if (zombie.dead) return;
+    zombie.hp -= damage;
+    if (zombie.hp <= 0) killZombie(zombie);
+  }
+
+  function detonateRocket(rocket) {
+    const x = rocket.target.x;
+    const y = rocket.target.y;
+    const radius = rocket.blastRadius;
+    for (const zombie of zombies) {
+      if (zombie.dead) continue;
+      const distance = Math.hypot(zombie.x - x, zombie.y - y);
+      if (distance <= radius) {
+        const damageScale = 1 - distance / (radius * 1.5);
+        damageZombie(zombie, Math.max(rocket.damage * 0.35, rocket.damage * damageScale));
+      }
+    }
+    effects.push({ type: "blast", x, y, radius, color: "#ffad58", life: 0.3, maxLife: 0.3 });
   }
 
   function updateEffects(dt) {
@@ -430,9 +510,21 @@
 
   function drawBullet(bullet) {
     ctx.save();
-    ctx.shadowColor = "#ffe294";
-    ctx.shadowBlur = 9;
-    ctx.fillStyle = "#ffe5a1";
+    const rocket = bullet.weapon === "rocket";
+    const color = rocket ? "#ff9b54" : bullet.weapon === "minigun" ? "#ffd278" : "#ffe294";
+    ctx.shadowColor = color;
+    ctx.shadowBlur = rocket ? 12 : 9;
+    ctx.fillStyle = color;
+    if (rocket) {
+      ctx.translate(bullet.x, bullet.y);
+      ctx.rotate(Math.atan2(bullet.target.y - bullet.y, bullet.target.x - bullet.x));
+      ctx.fillRect(-7, -3, 14, 6);
+      ctx.beginPath(); ctx.moveTo(7, -4); ctx.lineTo(12, 0); ctx.lineTo(7, 4); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = "#ffe2a0";
+      ctx.fillRect(-9, -1.5, 3, 3);
+      ctx.restore();
+      return;
+    }
     ctx.beginPath(); ctx.arc(bullet.x, bullet.y, 3, 0, Math.PI * 2); ctx.fill();
     ctx.restore();
   }
@@ -441,7 +533,24 @@
     for (const effect of effects) {
       const alpha = Math.max(0, effect.life / effect.maxLife);
       ctx.globalAlpha = alpha;
-      if (effect.text) {
+      if (effect.type === "beam") {
+        ctx.save();
+        ctx.strokeStyle = effect.color;
+        ctx.lineWidth = 5 * alpha + 1;
+        ctx.shadowColor = effect.color;
+        ctx.shadowBlur = 15;
+        ctx.beginPath();
+        ctx.moveTo(effect.x1, effect.y1);
+        ctx.lineTo(effect.x2, effect.y2);
+        ctx.stroke();
+        ctx.restore();
+      } else if (effect.type === "blast") {
+        ctx.strokeStyle = effect.color;
+        ctx.lineWidth = 5 * alpha;
+        ctx.beginPath();
+        ctx.arc(effect.x, effect.y, effect.radius * (1 - alpha + 0.2), 0, Math.PI * 2);
+        ctx.stroke();
+      } else if (effect.text) {
         ctx.fillStyle = effect.color;
         ctx.font = "10px 'DM Mono', monospace";
         ctx.textAlign = "center";
@@ -482,10 +591,17 @@
     const list = $("#upgrade-list");
     list.replaceChildren();
     for (const upgrade of upgrades) {
+      if (upgrade.id === "minigun") {
+        const heading = document.createElement("div");
+        heading.className = "upgrade-section-label";
+        heading.textContent = "AUTOMATIC WEAPON SYSTEMS";
+        list.append(heading);
+      }
       const level = levelOf(upgrade.id);
       const cost = costOf(upgrade);
       const card = document.createElement("article");
-      card.className = "upgrade-card";
+      card.className = `upgrade-card${level > 0 && ["minigun", "laser", "rockets"].includes(upgrade.id) ? " weapon-unlocked" : ""}`;
+      card.dataset.upgrade = upgrade.id;
       card.innerHTML = `
         <div class="upgrade-card-top">
           <span class="upgrade-icon">${upgrade.icon}</span>
@@ -493,7 +609,7 @@
           <span class="upgrade-level">LV ${level}</span>
         </div>
         <div class="upgrade-bottom"><span class="upgrade-cost">✦ ${cost.toLocaleString()} COINS</span>
-          <button class="upgrade-button" ${save.coins < cost || gameState !== "playing" ? "disabled" : ""}>UPGRADE</button>
+          <button class="upgrade-button" ${save.coins < cost || gameState !== "playing" ? "disabled" : ""}>${["minigun", "laser", "rockets"].includes(upgrade.id) && level === 0 ? "UNLOCK" : "UPGRADE"}</button>
         </div>`;
       card.querySelector("button").addEventListener("click", () => buyUpgrade(upgrade));
       list.append(card);
@@ -508,6 +624,9 @@
       case "walls": return `Max integrity +55 · repairs the house`;
       case "garden": return save.garden === 0 ? "Unlocks damage to nearby zombies." : `Contact damage: ${save.garden * 2.2 + save.houseLevel} / sec`;
       case "income": return `Supply income: ${(save.income * 0.12).toFixed(2)} coins / sec`;
+      case "minigun": return save.minigun === 0 ? "Buy to unlock an automatic rapid-fire turret." : `${3 + save.minigun * 2} damage · fires every ${Math.max(0.075, 0.24 - save.minigun * 0.025).toFixed(2)}s`;
+      case "laser": return save.laser === 0 ? "Buy to unlock an automatic piercing laser." : `${17 + save.laser * 12} line damage · recharges in ${Math.max(0.38, 1.35 - save.laser * 0.12).toFixed(2)}s`;
+      case "rockets": return save.rockets === 0 ? "Buy to unlock explosive area-damage rockets." : `${15 + save.rockets * 12} blast damage · ${52 + save.rockets * 3}px radius`;
       default: return "";
     }
   }

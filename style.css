@@ -77,7 +77,9 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--lime); outline-
 .level-bars i { width: 5px; height: 19px; border-radius: 2px; background: #384332; transform: skew(-12deg); }
 .level-bars i.active { background: var(--lime); box-shadow: 0 0 7px rgba(196, 229, 120, .27); }
 .upgrade-list { display: grid; gap: 8px; margin-top: 12px; }
+.upgrade-section-label { grid-column: 1 / -1; margin: 6px 2px -2px; color: #c3b682; font: 8px "DM Mono", monospace; letter-spacing: .12em; }
 .upgrade-card { padding: 10px; border: 1px solid rgba(190, 205, 158, .12); border-radius: 8px; background: rgba(12, 17, 13, .38); transition: border-color .2s, transform .2s; }
+.upgrade-card.weapon-unlocked { border-color: rgba(123, 203, 202, .28); background: linear-gradient(100deg, rgba(51, 111, 103, .13), rgba(12, 17, 13, .38)); }
 .upgrade-card:hover { border-color: rgba(196, 229, 120, .3); transform: translateY(-1px); }
 .upgrade-card-top { display: flex; align-items: center; gap: 9px; }
 .upgrade-icon { display: grid; width: 31px; height: 31px; flex: 0 0 31px; place-items: center; border: 1px solid rgba(190, 205, 158, .12); border-radius: 7px; background: #20291e; color: #d6dcbd; font-size: 17px; }
