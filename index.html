@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#101711">
+    <title>Last House Standing — AFK Zombie Defense</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="game.js" defer></script>
+  </head>
+  <body>
+    <main class="app">
+      <header class="topbar">
+        <a class="brand" href="#" aria-label="Last House Standing home">
+          <span class="brand-icon">⌂</span>
+          <span>LAST HOUSE <b>STANDING</b></span>
+        </a>
+        <div class="topbar-right">
+          <span class="status-pill"><i></i> DEFENSE SYSTEM ONLINE</span>
+          <button class="sound-button" id="sound-button" aria-label="Enable sound" title="Toggle sound">♫</button>
+        </div>
+      </header>
+
+      <section class="game-layout" aria-label="Zombie defense game">
+        <section class="battle-panel">
+          <div class="battle-top">
+            <div class="wave-label"><span class="eyebrow">CURRENT THREAT</span><strong>WAVE <b id="wave">1</b></strong></div>
+            <div class="wave-progress"><div><span id="wave-progress"></span></div><small id="wave-countdown">NEXT WAVE IN 30s</small></div>
+            <div class="survivor-count"><span class="eyebrow">ZOMBIES DOWN</span><strong id="kills">0</strong></div>
+          </div>
+          <div class="field-wrap">
+            <canvas id="field" aria-label="A house defending itself from zombies on a grassy field"></canvas>
+            <div class="field-overlay">
+              <div class="house-status"><span class="house-status-icon">⌂</span><div><span>HOME INTEGRITY</span><strong><b id="health">250</b> <small>/ <span id="max-health">250</span></small></strong></div></div>
+              <div class="coin-status"><span>✦</span><strong id="coins">40</strong></div>
+            </div>
+            <div class="banner-message" id="banner-message" role="status" aria-live="polite"></div>
+            <div class="defeat-overlay" id="defeat-overlay" hidden>
+              <div class="defeat-card">
+                <span class="defeat-icon">⌂</span>
+                <span class="eyebrow">THE NIGHT ISN'T OVER</span>
+                <h2>THE HOUSE FELL</h2>
+                <p>The survivors are regrouping. Your upgrades and supplies are safe.</p>
+                <button class="primary-button" id="rebuild-button">REBUILD &amp; HOLD THE LINE</button>
+              </div>
+            </div>
+          </div>
+          <div class="battle-footer">
+            <span><i class="legend-zombie"></i> THREATS APPROACH FROM ALL SIDES</span>
+            <span>AUTOMATIC DEFENSE <b>● ACTIVE</b></span>
+          </div>
+        </section>
+
+        <aside class="upgrade-panel">
+          <div class="panel-heading">
+            <span class="eyebrow">MAKE IT THROUGH THE NIGHT</span>
+            <h1>THE HOMESTEAD</h1>
+            <p>Reinforce your home. Hold back the horde.</p>
+          </div>
+          <div class="house-level-card">
+            <div class="house-level-icon">⌂</div>
+            <div><span>HOUSE LEVEL</span><strong id="house-level">1</strong></div>
+            <div class="level-bars" id="level-bars" aria-label="House level progress"></div>
+          </div>
+          <div class="upgrade-list" id="upgrade-list"></div>
+          <div class="upgrade-foot">
+            <span><span class="coin-small">✦</span> Coins are earned automatically from each zombie.</span>
+            <span>Your progress saves on this device.</span>
+          </div>
+        </aside>
+      </section>
+
+      <footer class="footer">
+        <span>THE GRASS ISN'T GREENER ON THE OTHER SIDE.</span>
+        <span>AFK DEFENSE · <b id="best-wave">BEST WAVE 1</b></span>
+      </footer>
+    </main>
+  </body>
+</html>

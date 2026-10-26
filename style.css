@@ -1,0 +1,138 @@
+@import url("https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap");
+
+:root {
+  color-scheme: dark;
+  font-family: "Space Grotesk", sans-serif;
+  background: #101711;
+  color: #f1f0e7;
+  --muted: #929a89;
+  --line: rgba(190, 205, 158, .13);
+  --lime: #c4e578;
+  --gold: #f3cc76;
+}
+
+* { box-sizing: border-box; }
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  margin: 0;
+  background: radial-gradient(ellipse at 48% 0%, rgba(92, 121, 64, .14), transparent 55%), #101711;
+}
+button { font: inherit; }
+button:focus-visible, a:focus-visible { outline: 2px solid var(--lime); outline-offset: 3px; }
+.app { width: min(1220px, calc(100% - 48px)); margin: 0 auto; }
+.topbar { height: 75px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--line); }
+.brand { display: flex; align-items: center; gap: 11px; color: #f4f1e6; text-decoration: none; font-size: 12px; font-weight: 700; letter-spacing: .13em; }
+.brand b { color: var(--lime); }
+.brand-icon { display: grid; width: 35px; height: 35px; place-items: center; border: 1px solid rgba(196, 229, 120, .4); border-radius: 9px; background: rgba(196, 229, 120, .08); color: var(--lime); font-size: 24px; }
+.topbar-right { display: flex; align-items: center; gap: 16px; }
+.status-pill, .eyebrow, .battle-footer, .house-level-card > div:nth-child(2) > span, .upgrade-cost, .upgrade-foot, .footer {
+  font-family: "DM Mono", monospace;
+  letter-spacing: .08em;
+}
+.status-pill { display: flex; align-items: center; gap: 8px; color: #9ba38e; font-size: 9px; }
+.status-pill i { width: 6px; height: 6px; border-radius: 50%; background: var(--lime); box-shadow: 0 0 9px rgba(196, 229, 120, .7); }
+.sound-button { width: 35px; height: 35px; border: 1px solid var(--line); border-radius: 8px; background: #171e18; color: #d6ddc8; cursor: pointer; }
+.sound-button.muted { color: #697361; }
+.game-layout { display: grid; grid-template-columns: minmax(0, 1fr) 344px; gap: 15px; padding: 20px 0 14px; align-items: stretch; }
+.battle-panel, .upgrade-panel { overflow: hidden; border: 1px solid rgba(190, 205, 158, .16); border-radius: 12px; background: #171e18; box-shadow: 0 18px 55px rgba(0, 0, 0, .22); }
+.battle-panel { display: flex; min-width: 0; flex-direction: column; }
+.battle-top { min-height: 72px; display: grid; grid-template-columns: 1fr minmax(120px, 1.15fr) 1fr; align-items: center; gap: 18px; padding: 12px 18px; border-bottom: 1px solid var(--line); background: linear-gradient(100deg, #1b241b, #1a2119); }
+.wave-label, .survivor-count { display: grid; gap: 4px; }
+.eyebrow { color: #89917e; font-size: 8px; }
+.wave-label > strong { font-size: 20px; line-height: 1; letter-spacing: .02em; }
+.wave-label > strong b { color: var(--lime); }
+.survivor-count { justify-items: end; }
+.survivor-count strong { color: #f2d58c; font-size: 19px; line-height: 1; }
+.wave-progress > div { height: 5px; overflow: hidden; border-radius: 5px; background: #303a2d; }
+.wave-progress > div > span { display: block; width: 0; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #9bbd5e, #d5e98f); box-shadow: 0 0 10px rgba(196, 229, 120, .4); transition: width .25s; }
+.wave-progress small { display: block; margin-top: 6px; color: #8e9882; font: 8px "DM Mono", monospace; text-align: center; }
+.field-wrap { position: relative; min-height: 380px; flex: 1; overflow: hidden; background: #4d713b; }
+#field { position: absolute; inset: 0; width: 100%; height: 100%; }
+.field-overlay { position: absolute; inset: 13px 14px auto; display: flex; justify-content: space-between; align-items: flex-start; pointer-events: none; }
+.house-status, .coin-status { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border: 1px solid rgba(233, 240, 215, .2); border-radius: 7px; background: rgba(16, 24, 16, .76); box-shadow: 0 4px 15px rgba(0, 0, 0, .16); backdrop-filter: blur(5px); }
+.house-status-icon { color: var(--lime); font-size: 21px; }
+.house-status > div { display: grid; gap: 1px; }
+.house-status > div > span { color: #b3bd9e; font: 7px "DM Mono", monospace; letter-spacing: .1em; }
+.house-status strong { font-size: 14px; }
+.house-status strong small { color: #abb49c; font-size: 9px; font-weight: 400; }
+.coin-status { color: var(--gold); }
+.coin-status > span { font-size: 15px; }
+.coin-status strong { font: 13px "DM Mono", monospace; }
+.battle-footer { min-height: 34px; display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 0 15px; color: #87917d; font-size: 7px; }
+.battle-footer b { color: var(--lime); font-size: 7px; }
+.legend-zombie { display: inline-block; width: 6px; height: 6px; margin-right: 5px; border-radius: 50%; background: #c8a182; }
+.banner-message { position: absolute; top: 17%; left: 50%; z-index: 2; padding: 7px 11px; border: 1px solid rgba(241, 208, 124, .4); border-radius: 5px; background: rgba(20, 25, 16, .82); color: #f2d58c; font: 9px "DM Mono", monospace; letter-spacing: .1em; opacity: 0; pointer-events: none; transform: translate(-50%, -5px); transition: opacity .2s, transform .2s; }
+.banner-message.show { opacity: 1; transform: translate(-50%, 0); }
+.upgrade-panel { display: flex; flex-direction: column; padding: 17px; }
+.panel-heading { padding: 2px 2px 13px; }
+.panel-heading h1 { margin: 6px 0 4px; font-size: 23px; letter-spacing: -.04em; }
+.panel-heading p { margin: 0; color: #9ba38f; font-size: 11px; }
+.house-level-card { display: flex; align-items: center; gap: 10px; padding: 10px; border: 1px solid rgba(196, 229, 120, .19); border-radius: 8px; background: linear-gradient(110deg, rgba(196, 229, 120, .09), rgba(196, 229, 120, .025)); }
+.house-level-icon { display: grid; width: 37px; height: 37px; place-items: center; border-radius: 7px; background: rgba(196, 229, 120, .14); color: var(--lime); font-size: 24px; }
+.house-level-card > div:nth-child(2) { display: grid; gap: 1px; }
+.house-level-card > div:nth-child(2) > span { color: #9ba38d; font-size: 7px; }
+.house-level-card > div:nth-child(2) > strong { color: #f3f0e6; font-size: 19px; line-height: 1; }
+.level-bars { display: flex; gap: 3px; margin-left: auto; }
+.level-bars i { width: 5px; height: 19px; border-radius: 2px; background: #384332; transform: skew(-12deg); }
+.level-bars i.active { background: var(--lime); box-shadow: 0 0 7px rgba(196, 229, 120, .27); }
+.upgrade-list { display: grid; gap: 8px; margin-top: 12px; }
+.upgrade-card { padding: 10px; border: 1px solid rgba(190, 205, 158, .12); border-radius: 8px; background: rgba(12, 17, 13, .38); transition: border-color .2s, transform .2s; }
+.upgrade-card:hover { border-color: rgba(196, 229, 120, .3); transform: translateY(-1px); }
+.upgrade-card-top { display: flex; align-items: center; gap: 9px; }
+.upgrade-icon { display: grid; width: 31px; height: 31px; flex: 0 0 31px; place-items: center; border: 1px solid rgba(190, 205, 158, .12); border-radius: 7px; background: #20291e; color: #d6dcbd; font-size: 17px; }
+.upgrade-copy { min-width: 0; flex: 1; }
+.upgrade-copy h2 { margin: 0 0 2px; color: #e6e7d9; font-size: 11px; }
+.upgrade-copy p { margin: 0; color: #8e9885; font-size: 8px; line-height: 1.35; }
+.upgrade-level { color: #9ca68b; font: 8px "DM Mono", monospace; }
+.upgrade-bottom { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 8px; }
+.upgrade-cost { color: var(--gold); font-size: 8px; }
+.upgrade-button { min-width: 92px; padding: 6px 9px; border: 1px solid rgba(196, 229, 120, .28); border-radius: 5px; background: rgba(135, 166, 83, .15); color: #d9e7b7; font-size: 8px; font-weight: 700; letter-spacing: .06em; cursor: pointer; transition: background .15s, border-color .15s; }
+.upgrade-button:not(:disabled):hover { border-color: var(--lime); background: rgba(135, 166, 83, .27); }
+.upgrade-button:disabled { border-color: rgba(190, 205, 158, .09); background: rgba(190, 205, 158, .04); color: #697360; cursor: default; }
+.upgrade-foot { display: grid; gap: 5px; margin-top: auto; padding: 13px 2px 0; color: #7e8876; font-size: 7px; line-height: 1.45; }
+.coin-small { color: var(--gold); }
+.footer { min-height: 41px; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--line); color: #75806f; font-size: 8px; }
+.footer b { color: #aeb998; font-weight: 400; }
+.defeat-overlay { position: absolute; inset: 0; z-index: 3; display: grid; place-items: center; background: rgba(10, 14, 10, .72); backdrop-filter: blur(5px); }
+.defeat-overlay[hidden] { display: none; }
+.defeat-card { width: min(360px, calc(100% - 28px)); padding: 24px; border: 1px solid rgba(196, 229, 120, .25); border-radius: 12px; background: #192119; text-align: center; box-shadow: 0 18px 55px rgba(0, 0, 0, .45); }
+.defeat-icon { display: block; margin-bottom: 6px; color: var(--lime); font-size: 34px; }
+.defeat-card h2 { margin: 8px 0; font-size: 21px; }
+.defeat-card p { margin: 0 0 17px; color: #a6af9b; font-size: 11px; line-height: 1.5; }
+.primary-button { width: 100%; min-height: 40px; border: 1px solid rgba(213, 236, 158, .56); border-radius: 6px; background: linear-gradient(100deg, #819b4f, #5f7940); color: #f3f5e8; font-size: 9px; font-weight: 700; letter-spacing: .08em; cursor: pointer; }
+.primary-button:hover { filter: brightness(1.1); }
+
+@media (min-width: 1150px) { .field-wrap { min-height: 470px; } }
+@media (max-width: 900px) {
+  .app { width: min(100% - 28px, 700px); }
+  .game-layout { grid-template-columns: 1fr; }
+  .field-wrap { min-height: min(52vw, 430px); }
+  .upgrade-panel { min-height: 0; }
+  .upgrade-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .upgrade-foot { margin-top: 13px; }
+}
+@media (max-width: 540px) {
+  .app { width: calc(100% - 20px); }
+  .topbar { height: 61px; }
+  .brand { gap: 7px; font-size: 9px; }
+  .brand-icon { width: 30px; height: 30px; font-size: 21px; }
+  .status-pill { font-size: 0; }
+  .status-pill i { width: 7px; height: 7px; }
+  .topbar-right { gap: 9px; }
+  .game-layout { gap: 10px; padding-top: 10px; }
+  .battle-top { min-height: 62px; gap: 8px; padding: 9px; }
+  .wave-label > strong { font-size: 16px; }
+  .survivor-count strong { font-size: 16px; }
+  .eyebrow { font-size: 7px; }
+  .wave-progress small { font-size: 7px; }
+  .field-wrap { min-height: 320px; }
+  .field-overlay { inset: 9px 8px auto; }
+  .house-status, .coin-status { gap: 6px; padding: 6px 7px; }
+  .battle-footer { min-height: 31px; padding: 0 8px; font-size: 6px; }
+  .battle-footer b { font-size: 6px; }
+  .upgrade-panel { padding: 13px 11px; }
+  .upgrade-list { grid-template-columns: 1fr; gap: 7px; }
+  .upgrade-card { padding: 9px; }
+  .footer { gap: 8px; font-size: 6px; }
+}
