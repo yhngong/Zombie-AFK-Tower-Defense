@@ -26,13 +26,20 @@
           <div class="battle-top">
             <div class="wave-label"><span class="eyebrow">CURRENT THREAT</span><strong>WAVE <b id="wave">1</b></strong></div>
             <div class="wave-progress"><div><span id="wave-progress"></span></div><small id="wave-countdown">NEXT WAVE IN 30s</small></div>
-            <div class="survivor-count"><span class="eyebrow">ZOMBIES DOWN</span><strong id="kills">0</strong></div>
+            <div class="survivor-count">
+              <span class="eyebrow">ZOMBIES DOWN</span>
+              <strong id="kills">0</strong>
+              <span class="kill-streak" id="kill-streak" hidden>✦ <b id="streak-count">0</b> STREAK</span>
+            </div>
           </div>
           <div class="field-wrap">
             <canvas id="field" aria-label="A house defending itself from zombies on a grassy field"></canvas>
             <div class="field-overlay">
               <div class="house-status"><span class="house-status-icon">⌂</span><div><span>HOME INTEGRITY</span><strong><b id="health">250</b> <small>/ <span id="max-health">250</span></small></strong></div></div>
-              <div class="coin-status"><span>✦</span><strong id="coins">40</strong></div>
+              <div class="field-status-stack">
+                <div class="coin-status"><span>✦</span><strong id="coins">40</strong></div>
+                <div class="weather-status" id="weather-status"><i></i><span>CALM EVENING</span></div>
+              </div>
             </div>
             <div class="banner-message" id="banner-message" role="status" aria-live="polite"></div>
             <div class="defeat-overlay" id="defeat-overlay" hidden>
@@ -46,8 +53,11 @@
             </div>
           </div>
           <div class="battle-footer">
-            <span><i class="legend-zombie"></i> THREATS APPROACH FROM ALL SIDES</span>
-            <span>AUTOMATIC DEFENSE <b>● ACTIVE</b></span>
+            <span id="threat-status"><i class="legend-zombie"></i> THREATS APPROACH FROM ALL SIDES</span>
+            <div class="battle-footer-right">
+              <span>AUTOMATIC DEFENSE <b>● ACTIVE</b></span>
+              <button class="speed-toggle" id="speed-toggle" aria-label="Set game speed to double" title="Toggle game speed">1×</button>
+            </div>
           </div>
         </section>
 

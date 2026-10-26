@@ -34,7 +34,7 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--lime); outline-
 .status-pill i { width: 6px; height: 6px; border-radius: 50%; background: var(--lime); box-shadow: 0 0 9px rgba(196, 229, 120, .7); }
 .sound-button { width: 35px; height: 35px; border: 1px solid var(--line); border-radius: 8px; background: #171e18; color: #d6ddc8; cursor: pointer; }
 .sound-button.muted { color: #697361; }
-.game-layout { display: grid; grid-template-columns: minmax(0, 1fr) 344px; gap: 15px; padding: 20px 0 14px; align-items: stretch; }
+.game-layout { display: grid; grid-template-columns: minmax(0, 1fr) 344px; gap: 15px; padding: 20px 0 14px; align-items: start; }
 .battle-panel, .upgrade-panel { overflow: hidden; border: 1px solid rgba(190, 205, 158, .16); border-radius: 12px; background: #171e18; box-shadow: 0 18px 55px rgba(0, 0, 0, .22); }
 .battle-panel { display: flex; min-width: 0; flex-direction: column; }
 .battle-top { min-height: 72px; display: grid; grid-template-columns: 1fr minmax(120px, 1.15fr) 1fr; align-items: center; gap: 18px; padding: 12px 18px; border-bottom: 1px solid var(--line); background: linear-gradient(100deg, #1b241b, #1a2119); }
@@ -47,7 +47,7 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--lime); outline-
 .wave-progress > div { height: 5px; overflow: hidden; border-radius: 5px; background: #303a2d; }
 .wave-progress > div > span { display: block; width: 0; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #9bbd5e, #d5e98f); box-shadow: 0 0 10px rgba(196, 229, 120, .4); transition: width .25s; }
 .wave-progress small { display: block; margin-top: 6px; color: #8e9882; font: 8px "DM Mono", monospace; text-align: center; }
-.field-wrap { position: relative; min-height: 380px; flex: 1; overflow: hidden; background: #4d713b; }
+.field-wrap { position: relative; width: 100%; aspect-ratio: 900 / 560; min-height: 250px; flex: 0 0 auto; overflow: hidden; background: #31462d; }
 #field { position: absolute; inset: 0; width: 100%; height: 100%; }
 .field-overlay { position: absolute; inset: 13px 14px auto; display: flex; justify-content: space-between; align-items: flex-start; pointer-events: none; }
 .house-status, .coin-status { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border: 1px solid rgba(233, 240, 215, .2); border-radius: 7px; background: rgba(16, 24, 16, .76); box-shadow: 0 4px 15px rgba(0, 0, 0, .16); backdrop-filter: blur(5px); }
@@ -59,8 +59,23 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--lime); outline-
 .coin-status { color: var(--gold); }
 .coin-status > span { font-size: 15px; }
 .coin-status strong { font: 13px "DM Mono", monospace; }
+.field-status-stack { display: grid; justify-items: end; gap: 6px; }
+.weather-status { display: flex; align-items: center; gap: 6px; padding: 5px 8px; border: 1px solid rgba(206, 221, 169, .18); border-radius: 6px; background: rgba(16, 24, 16, .76); color: #e1e3c2; font: 7px "DM Mono", monospace; letter-spacing: .08em; backdrop-filter: blur(5px); }
+.weather-status i { width: 6px; height: 6px; border-radius: 50%; background: #d8e6a1; box-shadow: 0 0 8px currentColor; }
+.weather-status.dusk { color: #ffd49c; border-color: rgba(255, 174, 105, .35); }
+.weather-status.dusk i { background: #ffad65; }
+.weather-status.night { color: #c4d5fb; border-color: rgba(148, 176, 255, .35); }
+.weather-status.night i { background: #a8c0ff; }
+.weather-status.bloodmoon { color: #ffaaa0; border-color: rgba(255, 91, 91, .5); box-shadow: 0 0 14px rgba(255, 50, 60, .15); }
+.weather-status.bloodmoon i { background: #ff555b; }
+.kill-streak { color: #ffe294; font: 7px "DM Mono", monospace; letter-spacing: .07em; }
+.kill-streak[hidden] { display: none; }
+.kill-streak b { color: #fff0b6; font-weight: 500; }
 .battle-footer { min-height: 34px; display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 0 15px; color: #87917d; font-size: 7px; }
 .battle-footer b { color: var(--lime); font-size: 7px; }
+.battle-footer-right { display: flex; align-items: center; gap: 12px; }
+.speed-toggle { min-width: 29px; height: 22px; padding: 0 5px; border: 1px solid rgba(196, 229, 120, .3); border-radius: 5px; background: rgba(135, 166, 83, .13); color: var(--lime); font: 9px "DM Mono", monospace; cursor: pointer; }
+.speed-toggle:hover { border-color: var(--lime); background: rgba(135, 166, 83, .25); }
 .legend-zombie { display: inline-block; width: 6px; height: 6px; margin-right: 5px; border-radius: 50%; background: #c8a182; }
 .banner-message { position: absolute; top: 17%; left: 50%; z-index: 2; padding: 7px 11px; border: 1px solid rgba(241, 208, 124, .4); border-radius: 5px; background: rgba(20, 25, 16, .82); color: #f2d58c; font: 9px "DM Mono", monospace; letter-spacing: .1em; opacity: 0; pointer-events: none; transform: translate(-50%, -5px); transition: opacity .2s, transform .2s; }
 .banner-message.show { opacity: 1; transform: translate(-50%, 0); }
@@ -107,12 +122,11 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--lime); outline-
 .primary-button:hover { filter: brightness(1.1); }
 
 .upgrade-section-label.control-label { margin-top: 5px; color: #b8a4d5; }
+.upgrade-section-label.elite-label { margin-top: 5px; color: #e5c776; }
 
-@media (min-width: 1150px) { .field-wrap { min-height: 470px; } }
 @media (max-width: 900px) {
   .app { width: min(100% - 28px, 700px); }
   .game-layout { grid-template-columns: 1fr; }
-  .field-wrap { min-height: min(52vw, 430px); }
   .upgrade-panel { min-height: 0; }
   .upgrade-list { max-height: none; overflow: visible; grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .upgrade-foot { margin-top: 13px; }
@@ -131,11 +145,14 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--lime); outline-
   .survivor-count strong { font-size: 16px; }
   .eyebrow { font-size: 7px; }
   .wave-progress small { font-size: 7px; }
-  .field-wrap { min-height: 320px; }
+  .field-wrap { min-height: 230px; }
   .field-overlay { inset: 9px 8px auto; }
   .house-status, .coin-status { gap: 6px; padding: 6px 7px; }
+  .weather-status { padding: 4px 6px; font-size: 6px; }
   .battle-footer { min-height: 31px; padding: 0 8px; font-size: 6px; }
   .battle-footer b { font-size: 6px; }
+  .battle-footer-right { gap: 6px; }
+  .speed-toggle { min-width: 26px; height: 20px; font-size: 8px; }
   .upgrade-panel { padding: 13px 11px; }
   .upgrade-list { grid-template-columns: 1fr; gap: 7px; }
   .upgrade-card { padding: 9px; }

@@ -20,7 +20,14 @@
     { id: "lightning", name: "Storm Coil", icon: "ϟ", description: "Chain lightning jumps from its target to nearby zombies.", baseCost: 280, costScale: 1.82 },
     { id: "thorns", name: "Thorn Field", icon: "♧", description: "A thorny perimeter slows zombies near the house.", baseCost: 170, costScale: 1.72 },
     { id: "blackHole", name: "Black Hole", icon: "◉", description: "Pulls in and damages a group. Long recharge.", baseCost: 420, costScale: 1.9 },
-    { id: "smoke", name: "Smoke Bomb", icon: "☁", description: "Stuns a group of zombies in a cloud of smoke.", baseCost: 330, costScale: 1.84 }
+    { id: "smoke", name: "Smoke Bomb", icon: "☁", description: "Stuns a group of zombies in a cloud of smoke.", baseCost: 330, costScale: 1.84 },
+    { id: "sniper", name: "Deadeye Sniper", icon: "⌖", description: "A long-range rifle picks off a random zombie with a massive hit.", baseCost: 300, costScale: 1.82 },
+    { id: "frost", name: "Cryo Projector", icon: "❄", description: "Freezes a random cluster, slowing and damaging the whole group.", baseCost: 390, costScale: 1.86 },
+    { id: "flamethrower", name: "Flame Turret", icon: "♨", description: "Sets a random pack ablaze with damage-over-time flames.", baseCost: 440, costScale: 1.88 },
+    { id: "drones", name: "Drone Swarm", icon: "✣", description: "Autonomous drones pepper random zombies with rapid shots.", baseCost: 520, costScale: 1.9 },
+    { id: "mortar", name: "Mortar Battery", icon: "◌", description: "Lobs heavy shells into random groups for huge splash damage.", baseCost: 620, costScale: 1.94 },
+    { id: "railgun", name: "Railgun", icon: "═", description: "Fires a piercing energy lance through a random target and its neighbors.", baseCost: 760, costScale: 1.98 },
+    { id: "artillery", name: "Artillery Strike", icon: "✹", description: "Calls a devastating bombardment on a random patch of the field.", baseCost: 900, costScale: 2 }
   ];
   const freshSave = () => ({
     coins: 40,
@@ -28,6 +35,7 @@
     bestWave: 1,
     wave: 1,
     waveTime: 0,
+    bossDefeatedWave: 0,
     houseLevel: 1,
     weapon: 0,
     fireRate: 0,
@@ -41,6 +49,13 @@
     thorns: 0,
     blackHole: 0,
     smoke: 0,
+    sniper: 0,
+    frost: 0,
+    flamethrower: 0,
+    drones: 0,
+    mortar: 0,
+    railgun: 0,
+    artillery: 0,
     health: 250,
     savedAt: Date.now()
   });
@@ -59,6 +74,13 @@
   let lightningTimer = 0;
   let blackHoleTimer = 0;
   let smokeTimer = 0;
+  let sniperTimer = 0;
+  let frostTimer = 0;
+  let flameTimer = 0;
+  let droneTimer = 0;
+  let mortarTimer = 0;
+  let railgunTimer = 0;
+  let artilleryTimer = 0;
   let gameState = save.health > 0 ? "playing" : "defeated";
   let lastTime = 0;
   let saveTimer = 0;
@@ -66,6 +88,11 @@
   let soundEnabled = false;
   let bannerTimer;
   let upgradeRenderKey = "";
+  let gameSpeed = 1;
+  let bossSpawnedWave = 0;
+  let killStreak = 0;
+  let streakTimer = 0;
+  let screenShake = 0;
 
   function loadSave() {
     try {
@@ -154,7 +181,7 @@
     canvas.height = Math.max(1, Math.round(rect.height * dpr));
   }
 
-  function spawnZombie() {
+  function spawnZombie(forcedType) {
     const edge = Math.floor(Math.random() * 4);
     const inset = 16;
     let x;
@@ -163,11 +190,20 @@
     else if (edge === 1) { x = world.width - inset; y = Math.random() * world.height; }
     else if (edge === 2) { x = Math.random() * world.width; y = world.height - inset; }
     else { x = inset; y = Math.random() * world.height; }
-    const hp = 19 + save.wave * 4 + Math.random() * save.wave * 1.4;
+    let type = forcedType || "walker";
+    if (!forcedType && save.wave >= 3) {
+      const roll = Math.random();
+      if (roll < Math.min(0.13, save.wave * 0.008)) type = "runner";
+      else if (roll > 0.92) type = "brute";
+    }
+    const baseHp = 19 + save.wave * 4 + Math.random() * save.wave * 1.4;
+    const hp = type === "boss" ? baseHp * 16 : type === "brute" ? baseHp * 3.2 : type === "runner" ? baseHp * 0.7 : baseHp;
     zombies.push({
-      x, y, hp, maxHp: hp, speed: 12 + Math.min(save.wave * 0.35, 9) + Math.random() * 2,
-      radius: 8 + Math.random() * 3, attackTimer: Math.random() * 0.5,
-      tint: Math.floor(Math.random() * 3), wobble: Math.random() * Math.PI * 2,
+      x, y, hp, maxHp: hp,
+      speed: type === "boss" ? 8 + Math.min(save.wave * 0.2, 5) : type === "brute" ? 7 + Math.min(save.wave * 0.2, 5) : type === "runner" ? 25 + Math.min(save.wave * 0.55, 12) : 12 + Math.min(save.wave * 0.35, 9) + Math.random() * 2,
+      radius: type === "boss" ? 23 : type === "brute" ? 14 : type === "runner" ? 7 : 8 + Math.random() * 3,
+      attackTimer: Math.random() * 0.5,
+      type, tint: Math.floor(Math.random() * 3), wobble: Math.random() * Math.PI * 2,
       slowTimer: 0, stunTimer: 0, dead: false
     });
   }
@@ -178,6 +214,7 @@
 
   function update(dt) {
     if (gameState !== "playing") {
+      screenShake = Math.max(0, screenShake - dt);
       updateEffects(dt);
       return;
     }
@@ -186,9 +223,21 @@
       save.waveTime -= 32;
       save.wave++;
       save.bestWave = Math.max(save.bestWave, save.wave);
-      showBanner(`WAVE ${save.wave} · THE HORDE GROWS`);
+      if (save.wave % 5 === 0) {
+        showBanner(`☠ BLOOD MOON · BOSS WAVE ${save.wave}`);
+        screenShake = 0.65;
+      } else {
+        showBanner(`WAVE ${save.wave} · THE HORDE GROWS`);
+      }
       playTone(260, 0.14);
     }
+    if (save.wave % 5 === 0 && bossSpawnedWave !== save.wave && save.bossDefeatedWave !== save.wave) {
+      spawnZombie("boss");
+      bossSpawnedWave = save.wave;
+    }
+    streakTimer -= dt;
+    if (streakTimer <= 0) killStreak = 0;
+    screenShake = Math.max(0, screenShake - dt);
 
     spawnTimer -= dt;
     const spawnInterval = Math.max(0.48, 2.5 - save.wave * 0.1);
@@ -205,6 +254,13 @@
     lightningTimer -= dt;
     blackHoleTimer -= dt;
     smokeTimer -= dt;
+    sniperTimer -= dt;
+    frostTimer -= dt;
+    flameTimer -= dt;
+    droneTimer -= dt;
+    mortarTimer -= dt;
+    railgunTimer -= dt;
+    artilleryTimer -= dt;
     const target = findTarget();
     if (target && shotTimer <= 0) {
       bullets.push({ x: center.x, y: center.y - 13, target, speed: 390, damage: damagePerShot(), life: 2, weapon: "house" });
@@ -299,8 +355,107 @@
         if (stunned) playTone(250, 0.16);
       }
     }
+    if (target && save.sniper > 0 && sniperTimer <= 0) {
+      const shotTarget = findRandomTarget();
+      if (shotTarget) {
+        bullets.push({
+          x: center.x, y: center.y - 22, target: shotTarget, speed: 780,
+          damage: 42 + save.sniper * 26, life: 2, weapon: "sniper"
+        });
+        sniperTimer = Math.max(0.65, 2.8 - save.sniper * 0.18);
+      }
+    }
+    if (target && save.frost > 0 && frostTimer <= 0) {
+      const frostTarget = findRandomTarget();
+      if (frostTarget) {
+        const radius = 82 + save.frost * 9;
+        for (const zombie of zombies) {
+          if (zombie.dead || Math.hypot(zombie.x - frostTarget.x, zombie.y - frostTarget.y) > radius) continue;
+          zombie.hp -= 8 + save.frost * 5;
+          zombie.slowTimer = Math.max(zombie.slowTimer, 2.2 + save.frost * 0.35);
+          if (zombie.hp <= 0) killZombie(zombie);
+        }
+        effects.push({ type: "frost", x: frostTarget.x, y: frostTarget.y, radius, life: 0.55, maxLife: 0.55 });
+        frostTimer = Math.max(1.1, 3.6 - save.frost * 0.2);
+      }
+    }
+    if (target && save.flamethrower > 0 && flameTimer <= 0) {
+      const flameTarget = findRandomTarget();
+      if (flameTarget) {
+        const radius = 73 + save.flamethrower * 7;
+        for (const zombie of zombies) {
+          if (zombie.dead || Math.hypot(zombie.x - flameTarget.x, zombie.y - flameTarget.y) > radius) continue;
+          zombie.burnTimer = Math.max(zombie.burnTimer || 0, 2.5 + save.flamethrower * 0.35);
+        }
+        effects.push({ type: "flame", x: flameTarget.x, y: flameTarget.y, radius, life: 0.7, maxLife: 0.7 });
+        flameTimer = Math.max(0.8, 2.5 - save.flamethrower * 0.14);
+      }
+    }
+    if (target && save.drones > 0 && droneTimer <= 0) {
+      const droneTarget = findRandomTarget();
+      if (droneTarget) {
+        bullets.push({
+          x: center.x + (Math.random() - 0.5) * 70,
+          y: center.y - 45 - Math.random() * 35, target: droneTarget,
+          speed: 500, damage: 8 + save.drones * 5, life: 2, weapon: "drone"
+        });
+        droneTimer = Math.max(0.16, 0.62 - save.drones * 0.035);
+      }
+    }
+    if (target && save.mortar > 0 && mortarTimer <= 0) {
+      const mortarTarget = findRandomTarget();
+      if (mortarTarget) {
+        bullets.push({
+          x: center.x - 25, y: center.y - 30, target: mortarTarget,
+          speed: 145, damage: 45 + save.mortar * 28, life: 4,
+          weapon: "mortar", blastRadius: 76 + save.mortar * 8
+        });
+        mortarTimer = Math.max(1.8, 5.4 - save.mortar * 0.28);
+      }
+    }
+    if (target && save.railgun > 0 && railgunTimer <= 0) {
+      const railTarget = findRandomTarget();
+      if (railTarget) {
+        const start = { x: center.x + 12, y: center.y - 28 };
+        const dx = railTarget.x - start.x;
+        const dy = railTarget.y - start.y;
+        const lengthSquared = dx * dx + dy * dy;
+        for (const zombie of zombies) {
+          if (zombie.dead) continue;
+          const projection = Math.max(0, Math.min(1, ((zombie.x - start.x) * dx + (zombie.y - start.y) * dy) / lengthSquared));
+          const nearestX = start.x + projection * dx;
+          const nearestY = start.y + projection * dy;
+          if (Math.hypot(zombie.x - nearestX, zombie.y - nearestY) < zombie.radius + 5) {
+            damageZombie(zombie, 52 + save.railgun * 32);
+          }
+        }
+        effects.push({ type: "beam", x1: start.x, y1: start.y, x2: railTarget.x, y2: railTarget.y, color: "#d6a4ff", life: 0.25, maxLife: 0.25 });
+        railgunTimer = Math.max(1.1, 3.8 - save.railgun * 0.2);
+      }
+    }
+    if (target && save.artillery > 0 && artilleryTimer <= 0) {
+      const strikeTarget = findRandomTarget();
+      if (strikeTarget) {
+        const radius = 105 + save.artillery * 10;
+        for (const zombie of zombies) {
+          if (zombie.dead) continue;
+          const distance = Math.hypot(zombie.x - strikeTarget.x, zombie.y - strikeTarget.y);
+          if (distance <= radius) {
+            damageZombie(zombie, Math.max(20, (75 + save.artillery * 42) * (1 - distance / (radius * 1.25))));
+          }
+        }
+        effects.push({ type: "blast", x: strikeTarget.x, y: strikeTarget.y, radius, color: "#ffe17b", life: 0.55, maxLife: 0.55 });
+        screenShake = Math.max(screenShake, 0.28);
+        artilleryTimer = Math.max(3.2, 9 - save.artillery * 0.4);
+      }
+    }
 
     for (const zombie of zombies) {
+      if (zombie.burnTimer > 0) {
+        zombie.burnTimer = Math.max(0, zombie.burnTimer - dt);
+        damageZombie(zombie, (5 + save.flamethrower * 2) * dt);
+        if (zombie.dead) continue;
+      }
       zombie.slowTimer = Math.max(0, zombie.slowTimer - dt);
       zombie.stunTimer = Math.max(0, zombie.stunTimer - dt);
       const dx = center.x - zombie.x;
@@ -340,7 +495,7 @@
       const dx = bullet.target.x - bullet.x;
       const dy = bullet.target.y - bullet.y;
       const distance = Math.hypot(dx, dy);
-      if (bullet.weapon === "rocket") {
+      if (bullet.weapon === "rocket" || bullet.weapon === "mortar") {
         if (distance < bullet.speed * dt + bullet.target.radius) {
           bullet.dead = true;
           detonateRocket(bullet);
@@ -378,6 +533,7 @@
     if (save.health <= 0) {
       save.health = 0;
       gameState = "defeated";
+      screenShake = 0.8;
       zombies = [];
       bullets = [];
       $("#defeat-overlay").hidden = false;
@@ -420,13 +576,26 @@
     if (zombie.dead) return;
     zombie.dead = true;
     save.kills++;
-    save.coins += 3 + Math.floor(save.wave / 2);
-    for (let i = 0; i < 9; i++) {
+    const reward = (3 + Math.floor(save.wave / 2)) * (zombie.type === "boss" ? 18 : zombie.type === "brute" ? 4 : zombie.type === "runner" ? 2 : 1);
+    save.coins += reward;
+    killStreak++;
+    streakTimer = 3.2;
+    if (killStreak > 0 && killStreak % 5 === 0) {
+      const bonus = 10 + Math.floor(save.wave / 2) * 2;
+      save.coins += bonus;
+      showBanner(`✦ ${killStreak} KILL STREAK · +${bonus} BONUS`);
+    }
+    if (zombie.type === "boss") {
+      save.bossDefeatedWave = save.wave;
+      showBanner(`BOSS DOWN · +${reward} COINS`);
+      screenShake = 0.5;
+    }
+    for (let i = 0; i < (zombie.type === "boss" ? 32 : 9); i++) {
       const angle = Math.random() * Math.PI * 2;
       const speed = 18 + Math.random() * 54;
       effects.push({ x: zombie.x, y: zombie.y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, color: ["#b5c771", "#dd9878", "#b58a76"][zombie.tint], life: 0.4 + Math.random() * 0.45, maxLife: 0.8, size: 1.5 + Math.random() * 2 });
     }
-    playTone(680, 0.045);
+    playTone(zombie.type === "boss" ? 190 : 680, zombie.type === "boss" ? 0.24 : 0.045);
   }
 
   function damageZombie(zombie, damage) {
@@ -447,7 +616,11 @@
         damageZombie(zombie, Math.max(rocket.damage * 0.35, rocket.damage * damageScale));
       }
     }
-    effects.push({ type: "blast", x, y, radius, color: "#ffad58", life: 0.3, maxLife: 0.3 });
+    effects.push({
+      type: "blast", x, y, radius,
+      color: rocket.weapon === "mortar" ? "#f3d982" : "#ffad58",
+      life: 0.3, maxLife: 0.3
+    });
   }
 
   function chainLightning(projectile) {
@@ -511,9 +684,17 @@
   }
 
   function drawField() {
-    const sx = canvas.width / world.width;
-    const sy = canvas.height / world.height;
-    ctx.setTransform(sx, 0, 0, sy, 0, 0);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.fillStyle = "#31462d";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    const scale = Math.min(canvas.width / world.width, canvas.height / world.height);
+    const offsetX = (canvas.width - world.width * scale) / 2;
+    const offsetY = (canvas.height - world.height * scale) / 2;
+    ctx.setTransform(scale, 0, 0, scale, offsetX, offsetY);
+    if (screenShake > 0) {
+      const shake = screenShake * 7;
+      ctx.translate((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake);
+    }
     const grassGradient = ctx.createLinearGradient(0, 0, 0, world.height);
     grassGradient.addColorStop(0, "#4f7440");
     grassGradient.addColorStop(0.5, "#597f43");
@@ -544,10 +725,55 @@
     ctx.fill();
     drawThornField();
     for (const tree of trees) drawTree(tree);
+    drawAtmosphere();
     drawHouse();
+    drawDefenseNodes();
     for (const zombie of zombies) drawZombie(zombie);
     for (const bullet of bullets) drawBullet(bullet);
     drawEffects();
+  }
+
+  function drawAtmosphere() {
+    const elapsed = ((save.wave - 1) * 32 + save.waveTime) % 90;
+    const bloodMoon = save.wave % 5 === 0;
+    const dusk = !bloodMoon && elapsed >= 48 && elapsed < 66;
+    const night = !bloodMoon && elapsed >= 66;
+    const darkness = bloodMoon ? 0.3 : night ? 0.37 : dusk ? 0.14 : 0;
+    if (darkness) {
+      ctx.fillStyle = bloodMoon
+        ? `rgba(63, 13, 24, ${darkness})`
+        : `rgba(10, 16, 31, ${darkness})`;
+      ctx.fillRect(0, 0, world.width, world.height);
+    }
+    if (night || bloodMoon) {
+      const moonX = 93;
+      const moonY = 74;
+      ctx.save();
+      ctx.shadowColor = bloodMoon ? "#ff4b53" : "#d9e4bc";
+      ctx.shadowBlur = bloodMoon ? 26 : 18;
+      ctx.fillStyle = bloodMoon ? "#d94a4e" : "#d5dfb2";
+      ctx.beginPath();
+      ctx.arc(moonX, moonY, bloodMoon ? 18 : 12, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+      for (let i = 0; i < 24; i++) {
+        const x = (i * 137 + 31) % world.width;
+        const y = (i * 71 + 18) % 180;
+        ctx.fillStyle = `rgba(238, 241, 210, ${0.25 + (i % 3) * 0.12})`;
+        ctx.fillRect(x, y, i % 5 === 0 ? 2 : 1, i % 5 === 0 ? 2 : 1);
+      }
+    } else if (dusk) {
+      const sky = ctx.createRadialGradient(82, 75, 3, 82, 75, 88);
+      sky.addColorStop(0, "rgba(255, 190, 110, .48)");
+      sky.addColorStop(1, "rgba(255, 151, 74, 0)");
+      ctx.fillStyle = sky;
+      ctx.fillRect(0, 0, world.width, 220);
+    }
+    const lamp = ctx.createRadialGradient(center.x, center.y, 15, center.x, center.y, 205);
+    lamp.addColorStop(0, bloodMoon ? "rgba(255, 86, 66, .17)" : "rgba(255, 221, 142, .13)");
+    lamp.addColorStop(1, "rgba(255, 221, 142, 0)");
+    ctx.fillStyle = lamp;
+    ctx.fillRect(center.x - 205, center.y - 205, 410, 410);
   }
 
   function drawTree(tree) {
@@ -643,15 +869,63 @@
     ctx.restore();
   }
 
+  function drawDefenseNodes() {
+    const systems = [
+      { level: save.minigun, color: "#ffd278", icon: "✣" },
+      { level: save.laser, color: "#75e6e4", icon: "⌁" },
+      { level: save.rockets, color: "#ff9860", icon: "➤" },
+      { level: save.lightning, color: "#a9d9ff", icon: "ϟ" },
+      { level: save.blackHole, color: "#c59bff", icon: "◉" },
+      { level: save.smoke, color: "#cbd6ce", icon: "☁" },
+      { level: save.sniper, color: "#e8e6d3", icon: "⌖" },
+      { level: save.frost, color: "#9beaff", icon: "❄" },
+      { level: save.flamethrower, color: "#ff994e", icon: "♨" },
+      { level: save.drones, color: "#d4e781", icon: "✣" },
+      { level: save.mortar, color: "#e6c77c", icon: "◌" },
+      { level: save.railgun, color: "#d6a4ff", icon: "═" },
+      { level: save.artillery, color: "#ffe17b", icon: "✹" }
+    ];
+    const installed = systems.filter((system) => system.level > 0);
+    installed.forEach((system, index) => {
+      const angle = index / installed.length * Math.PI * 2 - Math.PI / 2;
+      const x = center.x + Math.cos(angle) * 57;
+      const y = center.y + Math.sin(angle) * 42 - 8;
+      ctx.save();
+      ctx.shadowColor = system.color;
+      ctx.shadowBlur = 8;
+      ctx.fillStyle = "#273126";
+      ctx.strokeStyle = system.color;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(x, y, 8, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = system.color;
+      ctx.font = "bold 10px sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(system.icon, x, y + 0.5);
+      ctx.restore();
+    });
+  }
+
   function drawZombie(zombie) {
     ctx.save();
     ctx.translate(zombie.x, zombie.y);
     ctx.rotate(Math.atan2(center.y - zombie.y, center.x - zombie.x) + Math.PI / 2);
     const bob = Math.sin(zombie.wobble) * 1.5;
+    if (zombie.type === "boss") {
+      ctx.shadowColor = "#fb4b55";
+      ctx.shadowBlur = 20;
+      ctx.strokeStyle = "rgba(255, 92, 87, .8)";
+      ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(0, 0, zombie.radius + 6 + Math.sin(zombie.wobble * 0.5) * 2, 0, Math.PI * 2); ctx.stroke();
+    }
     ctx.fillStyle = "rgba(22, 30, 20, .28)";
     ctx.beginPath(); ctx.ellipse(1, zombie.radius * 0.75, zombie.radius * 0.9, 4, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = ["#899461", "#a88969", "#73875d"][zombie.tint];
-    ctx.lineWidth = 3;
+    ctx.strokeStyle = zombie.type === "boss" ? "#c4514e" : zombie.type === "brute" ? "#bf7d69" : zombie.type === "runner" ? "#b9d07b" : ["#899461", "#a88969", "#73875d"][zombie.tint];
+    ctx.lineWidth = zombie.type === "boss" ? 6 : zombie.type === "brute" ? 4 : 3;
     ctx.lineCap = "round";
     ctx.beginPath();
     ctx.moveTo(-4, 2 + bob); ctx.lineTo(-8, 8 + bob);
@@ -659,9 +933,9 @@
     ctx.moveTo(-4, -3 + bob); ctx.lineTo(-9, 0 + bob);
     ctx.moveTo(4, -3 + bob); ctx.lineTo(9, 0 + bob);
     ctx.stroke();
-    ctx.fillStyle = ["#83915b", "#a28264", "#718461"][zombie.tint];
+    ctx.fillStyle = zombie.type === "boss" ? "#75403e" : zombie.type === "brute" ? "#877052" : zombie.type === "runner" ? "#9aa85c" : ["#83915b", "#a28264", "#718461"][zombie.tint];
     ctx.beginPath(); ctx.ellipse(0, bob, zombie.radius * 0.72, zombie.radius, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = zombie.tint === 1 ? "#d1b08a" : "#aab77b";
+    ctx.fillStyle = zombie.type === "boss" ? "#aa5550" : zombie.type === "brute" ? "#b59a6c" : zombie.tint === 1 ? "#d1b08a" : "#aab77b";
     ctx.beginPath(); ctx.arc(0, -zombie.radius * 0.68 + bob, zombie.radius * 0.62, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = "#dcdeba";
     ctx.beginPath(); ctx.arc(-3, -zombie.radius * 0.76 + bob, 1.4, 0, Math.PI * 2); ctx.arc(3, -zombie.radius * 0.76 + bob, 1.4, 0, Math.PI * 2); ctx.fill();
@@ -676,6 +950,26 @@
       ctx.lineWidth = 1.5;
       ctx.beginPath(); ctx.arc(0, 0, zombie.radius + 3, 0, Math.PI * 2); ctx.stroke();
     }
+    if (zombie.burnTimer > 0) {
+      ctx.fillStyle = "#ffb34d";
+      ctx.shadowColor = "#ff5e2d";
+      ctx.shadowBlur = 9;
+      ctx.beginPath(); ctx.arc(0, -zombie.radius * 1.4 + bob, 2.5, 0, Math.PI * 2); ctx.fill();
+      ctx.shadowBlur = 0;
+    }
+    if (zombie.type === "boss") {
+      ctx.fillStyle = "#f1c66b";
+      ctx.beginPath();
+      ctx.moveTo(-zombie.radius * 0.65, -zombie.radius * 1.3);
+      ctx.lineTo(-zombie.radius * 0.8, -zombie.radius * 1.9);
+      ctx.lineTo(-zombie.radius * 0.25, -zombie.radius * 1.55);
+      ctx.lineTo(0, -zombie.radius * 2);
+      ctx.lineTo(zombie.radius * 0.27, -zombie.radius * 1.55);
+      ctx.lineTo(zombie.radius * 0.8, -zombie.radius * 1.9);
+      ctx.lineTo(zombie.radius * 0.65, -zombie.radius * 1.3);
+      ctx.closePath();
+      ctx.fill();
+    }
     ctx.restore();
     if (zombie.hp < zombie.maxHp) {
       const width = zombie.radius * 2;
@@ -688,14 +982,24 @@
 
   function drawBullet(bullet) {
     ctx.save();
-    const rocket = bullet.weapon === "rocket";
-    const color = rocket ? "#ff9b54" : bullet.weapon === "minigun" ? "#ffd278" : bullet.weapon === "lightning" ? "#a9f6ff" : "#ffe294";
+    const rocket = bullet.weapon === "rocket" || bullet.weapon === "mortar";
+    const color = bullet.weapon === "mortar" ? "#f3d982" : bullet.weapon === "rocket" ? "#ff9b54" :
+      bullet.weapon === "minigun" ? "#ffd278" : bullet.weapon === "lightning" ? "#a9f6ff" :
+        bullet.weapon === "sniper" ? "#f4edcf" : bullet.weapon === "drone" ? "#d4e781" : "#ffe294";
     ctx.shadowColor = color;
     ctx.shadowBlur = rocket ? 12 : 9;
     ctx.fillStyle = color;
     if (rocket) {
       ctx.translate(bullet.x, bullet.y);
       ctx.rotate(Math.atan2(bullet.target.y - bullet.y, bullet.target.x - bullet.x));
+      if (bullet.weapon === "mortar") {
+        ctx.beginPath(); ctx.arc(0, 0, 6, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = "#fff2c4";
+        ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(-9, 0); ctx.lineTo(-4, 0); ctx.stroke();
+        ctx.restore();
+        return;
+      }
       ctx.fillRect(-7, -3, 14, 6);
       ctx.beginPath(); ctx.moveTo(7, -4); ctx.lineTo(12, 0); ctx.lineTo(7, 4); ctx.closePath(); ctx.fill();
       ctx.fillStyle = "#ffe2a0";
@@ -775,11 +1079,42 @@
         ctx.stroke();
         ctx.restore();
       } else if (effect.type === "blast") {
-        ctx.strokeStyle = effect.color;
+        ctx.strokeStyle = effect.color || "#ffad58";
         ctx.lineWidth = 5 * alpha;
+        ctx.shadowColor = ctx.strokeStyle;
+        ctx.shadowBlur = 15;
         ctx.beginPath();
         ctx.arc(effect.x, effect.y, effect.radius * (1 - alpha + 0.2), 0, Math.PI * 2);
         ctx.stroke();
+        ctx.shadowBlur = 0;
+      } else if (effect.type === "frost") {
+        ctx.save();
+        ctx.strokeStyle = `rgba(156, 233, 255, ${0.8 * alpha})`;
+        ctx.lineWidth = 3;
+        ctx.shadowColor = "#86e4ff";
+        ctx.shadowBlur = 16;
+        ctx.beginPath(); ctx.arc(effect.x, effect.y, effect.radius * (1.1 - alpha * 0.1), 0, Math.PI * 2); ctx.stroke();
+        for (let i = 0; i < 6; i++) {
+          const angle = i / 6 * Math.PI * 2;
+          ctx.beginPath();
+          ctx.moveTo(effect.x, effect.y);
+          ctx.lineTo(effect.x + Math.cos(angle) * effect.radius * 0.8, effect.y + Math.sin(angle) * effect.radius * 0.8);
+          ctx.stroke();
+        }
+        ctx.restore();
+      } else if (effect.type === "flame") {
+        ctx.save();
+        ctx.fillStyle = `rgba(255, 83, 31, ${0.15 * alpha})`;
+        ctx.beginPath(); ctx.arc(effect.x, effect.y, effect.radius, 0, Math.PI * 2); ctx.fill();
+        for (let i = 0; i < 11; i++) {
+          const angle = i / 11 * Math.PI * 2 + (effect.maxLife - effect.life) * 2;
+          const distance = effect.radius * (0.3 + (i % 3) * 0.17);
+          const x = effect.x + Math.cos(angle) * distance;
+          const y = effect.y + Math.sin(angle) * distance;
+          ctx.fillStyle = i % 2 ? `rgba(255, 170, 57, ${0.7 * alpha})` : `rgba(255, 83, 31, ${0.8 * alpha})`;
+          ctx.beginPath(); ctx.ellipse(x, y, 4, 9 + (i % 3) * 2, angle, 0, Math.PI * 2); ctx.fill();
+        }
+        ctx.restore();
       } else if (effect.text) {
         ctx.fillStyle = effect.color;
         ctx.font = "10px 'DM Mono', monospace";
@@ -803,6 +1138,22 @@
     $("#house-level").textContent = save.houseLevel;
     $("#wave-progress").style.width = `${Math.min(100, save.waveTime / 32 * 100)}%`;
     $("#wave-countdown").textContent = `NEXT WAVE IN ${Math.ceil(32 - save.waveTime)}s`;
+    const weather = $("#weather-status");
+    const elapsed = ((save.wave - 1) * 32 + save.waveTime) % 90;
+    const isBloodMoon = save.wave % 5 === 0;
+    const phase = isBloodMoon ? "bloodmoon" : elapsed >= 66 ? "night" : elapsed >= 48 ? "dusk" : "day";
+    const labels = { bloodmoon: "BLOOD MOON", night: "MOONLIT NIGHT", dusk: "DUSK FALLING", day: "CLEAR SKIES" };
+    weather.className = `weather-status ${phase}`;
+    weather.querySelector("span").textContent = labels[phase];
+    const streak = $("#kill-streak");
+    streak.hidden = killStreak < 2 || streakTimer <= 0;
+    $("#streak-count").textContent = killStreak;
+    $("#speed-toggle").textContent = `${gameSpeed}×`;
+    $("#speed-toggle").setAttribute("aria-label", `Set game speed to ${gameSpeed === 1 ? "double" : "normal"}`);
+    $("#speed-toggle").title = `Game speed: ${gameSpeed}× (click to toggle)`;
+    $("#threat-status").lastChild.textContent = isBloodMoon
+      ? ` BLOOD MOON · BOSS WAVE ${save.wave}`
+      : " THREATS APPROACH FROM ALL SIDES";
     const bars = $("#level-bars");
     bars.replaceChildren();
     const visibleLevel = Math.min(8, save.houseLevel);
@@ -821,16 +1172,19 @@
     const list = $("#upgrade-list");
     list.replaceChildren();
     for (const upgrade of upgrades) {
-      if (upgrade.id === "minigun" || upgrade.id === "lightning") {
+      if (upgrade.id === "minigun" || upgrade.id === "lightning" || upgrade.id === "sniper") {
         const heading = document.createElement("div");
-        heading.className = `upgrade-section-label${upgrade.id === "lightning" ? " control-label" : ""}`;
-        heading.textContent = upgrade.id === "minigun" ? "AUTOMATIC WEAPON SYSTEMS" : "FIELD CONTROL & CROWD CONTROL";
+        heading.className = `upgrade-section-label${upgrade.id === "lightning" ? " control-label" : upgrade.id === "sniper" ? " elite-label" : ""}`;
+        heading.textContent = upgrade.id === "minigun" ? "AUTOMATIC WEAPON SYSTEMS" :
+          upgrade.id === "lightning" ? "FIELD CONTROL & CROWD CONTROL" : "ELITE ARMAMENTS";
         list.append(heading);
       }
       const level = levelOf(upgrade.id);
       const cost = costOf(upgrade);
+      const directWeapons = ["minigun", "laser", "rockets", "sniper", "drones", "mortar", "railgun", "artillery"];
+      const controlWeapons = ["lightning", "thorns", "blackHole", "smoke", "frost", "flamethrower"];
       const card = document.createElement("article");
-      card.className = `upgrade-card${level > 0 && ["minigun", "laser", "rockets"].includes(upgrade.id) ? " weapon-unlocked" : ""}${level > 0 && ["lightning", "thorns", "blackHole", "smoke"].includes(upgrade.id) ? " control-unlocked" : ""}`;
+      card.className = `upgrade-card${level > 0 && directWeapons.includes(upgrade.id) ? " weapon-unlocked" : ""}${level > 0 && controlWeapons.includes(upgrade.id) ? " control-unlocked" : ""}`;
       card.dataset.upgrade = upgrade.id;
       card.innerHTML = `
         <div class="upgrade-card-top">
@@ -861,6 +1215,13 @@
       case "thorns": return save.thorns === 0 ? "Buy to surround the home with a zombie-slowing field." : `Slows zombies in a ${160 + save.thorns * 10}px radius`;
       case "blackHole": return save.blackHole === 0 ? "Unlock a long-recharge gravity well that pulls and damages groups." : `${3 + save.blackHole * 2} pulse damage · ${Math.max(7, 15 - save.blackHole * 0.65).toFixed(1)}s recharge`;
       case "smoke": return save.smoke === 0 ? "Unlock a smoke bomb that stuns groups of zombies." : `Stuns for ${(1.5 + save.smoke * 0.35).toFixed(2)}s · ${Math.max(4.5, 9 - save.smoke * 0.35).toFixed(1)}s recharge`;
+      case "sniper": return save.sniper === 0 ? "Unlock a long-range rifle that deals huge single-target damage." : `${42 + save.sniper * 26} damage · ${Math.max(0.65, 2.8 - save.sniper * 0.18).toFixed(1)}s reload`;
+      case "frost": return save.frost === 0 ? "Unlock a chilling blast that slows and damages groups." : `${8 + save.frost * 5} damage · slows a ${82 + save.frost * 9}px area`;
+      case "flamethrower": return save.flamethrower === 0 ? "Unlock a turret that burns a group over time." : `${5 + save.flamethrower * 2} burn damage / sec · ${Math.max(0.8, 2.5 - save.flamethrower * 0.14).toFixed(1)}s reload`;
+      case "drones": return save.drones === 0 ? "Unlock a squadron of drones that fires at random targets." : `${8 + save.drones * 5} damage · every ${Math.max(0.16, 0.62 - save.drones * 0.035).toFixed(2)}s`;
+      case "mortar": return save.mortar === 0 ? "Unlock heavy shells that devastate a random cluster." : `${45 + save.mortar * 28} blast damage · ${76 + save.mortar * 8}px radius`;
+      case "railgun": return save.railgun === 0 ? "Unlock a piercing energy beam that hits targets in a line." : `${52 + save.railgun * 32} damage · ${Math.max(1.1, 3.8 - save.railgun * 0.2).toFixed(1)}s reload`;
+      case "artillery": return save.artillery === 0 ? "Unlock a massive bombardment at a random position." : `${75 + save.artillery * 42} blast damage · ${Math.max(3.2, 9 - save.artillery * 0.4).toFixed(1)}s reload`;
       default: return "";
     }
   }
@@ -893,6 +1254,7 @@
   function rebuild() {
     save.health = maxHealthFor();
     save.waveTime = 0;
+    bossSpawnedWave = save.bossDefeatedWave === save.wave ? save.wave : save.wave - 5;
     gameState = "playing";
     spawnTimer = 1;
     shotTimer = 0;
@@ -921,12 +1283,16 @@
     if (!lastTime) lastTime = now;
     const dt = Math.min((now - lastTime) / 1000, 0.05);
     lastTime = now;
-    update(dt);
+    for (let i = 0; i < gameSpeed; i++) update(dt);
     drawField();
     requestAnimationFrame(loop);
   }
 
   $("#rebuild-button").addEventListener("click", rebuild);
+  $("#speed-toggle").addEventListener("click", () => {
+    gameSpeed = gameSpeed === 1 ? 2 : 1;
+    refreshUI();
+  });
   $("#sound-button").addEventListener("click", async (event) => {
     soundEnabled = !soundEnabled;
     event.currentTarget.classList.toggle("muted", !soundEnabled);
