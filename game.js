@@ -212,76 +212,92 @@
       playTone(430, 0.035);
     }
     if (target && save.minigun > 0 && minigunTimer <= 0) {
-      bullets.push({
-        x: center.x + 22, y: center.y + 5, target,
-        speed: 540, damage: 3 + save.minigun * 2, life: 2, weapon: "minigun"
-      });
-      minigunTimer = Math.max(0.075, 0.24 - save.minigun * 0.025);
+      const minigunTarget = findRandomTarget();
+      if (minigunTarget) {
+        bullets.push({
+          x: center.x + 22, y: center.y + 5, target: minigunTarget,
+          speed: 540, damage: 3 + save.minigun * 2, life: 2, weapon: "minigun"
+        });
+        minigunTimer = Math.max(0.075, 0.24 - save.minigun * 0.025);
+      }
     }
     if (target && save.laser > 0 && laserTimer <= 0) {
-      const laserDamage = 17 + save.laser * 12;
-      const beamX = center.x - 20;
-      const beamY = center.y - 10;
-      const beamDx = target.x - beamX;
-      const beamDy = target.y - beamY;
-      const beamLength = beamDx * beamDx + beamDy * beamDy;
-      for (const zombie of zombies) {
-        if (zombie.dead) continue;
-        const projection = Math.max(0, Math.min(1, ((zombie.x - beamX) * beamDx + (zombie.y - beamY) * beamDy) / beamLength));
-        const closestX = beamX + projection * beamDx;
-        const closestY = beamY + projection * beamDy;
-        if (Math.hypot(zombie.x - closestX, zombie.y - closestY) <= zombie.radius + 7) {
-          damageZombie(zombie, laserDamage);
+      const laserTarget = findRandomTarget();
+      if (laserTarget) {
+        const laserDamage = 17 + save.laser * 12;
+        const beamX = center.x - 20;
+        const beamY = center.y - 10;
+        const beamDx = laserTarget.x - beamX;
+        const beamDy = laserTarget.y - beamY;
+        const beamLength = beamDx * beamDx + beamDy * beamDy;
+        for (const zombie of zombies) {
+          if (zombie.dead) continue;
+          const projection = Math.max(0, Math.min(1, ((zombie.x - beamX) * beamDx + (zombie.y - beamY) * beamDy) / beamLength));
+          const closestX = beamX + projection * beamDx;
+          const closestY = beamY + projection * beamDy;
+          if (Math.hypot(zombie.x - closestX, zombie.y - closestY) <= zombie.radius + 7) {
+            damageZombie(zombie, laserDamage);
+          }
         }
+        effects.push({
+          type: "beam", x1: beamX, y1: beamY, x2: laserTarget.x, y2: laserTarget.y,
+          color: "#71eaff", life: 0.16, maxLife: 0.16
+        });
+        laserTimer = Math.max(0.38, 1.35 - save.laser * 0.12);
+        playTone(780, 0.055);
       }
-      effects.push({
-        type: "beam", x1: beamX, y1: beamY, x2: target.x, y2: target.y,
-        color: "#71eaff", life: 0.16, maxLife: 0.16
-      });
-      laserTimer = Math.max(0.38, 1.35 - save.laser * 0.12);
-      playTone(780, 0.055);
     }
     if (target && save.rockets > 0 && rocketTimer <= 0) {
-      bullets.push({
-        x: center.x, y: center.y - 24, target,
-        speed: 240, damage: 15 + save.rockets * 12, life: 3,
-        weapon: "rocket", blastRadius: 52 + save.rockets * 3
-      });
-      rocketTimer = Math.max(0.65, 2.1 - save.rockets * 0.13);
-      playTone(190, 0.09);
+      const rocketTarget = findRandomTarget();
+      if (rocketTarget) {
+        bullets.push({
+          x: center.x, y: center.y - 24, target: rocketTarget,
+          speed: 240, damage: 15 + save.rockets * 12, life: 3,
+          weapon: "rocket", blastRadius: 52 + save.rockets * 3
+        });
+        rocketTimer = Math.max(0.65, 2.1 - save.rockets * 0.13);
+        playTone(190, 0.09);
+      }
     }
     if (target && save.lightning > 0 && lightningTimer <= 0) {
-      bullets.push({
-        x: center.x + 8, y: center.y - 12, target,
-        speed: 470, damage: 15 + save.lightning * 8,
-        chainCount: 2 + save.lightning, chainRange: 92 + save.lightning * 12,
-        life: 2, weapon: "lightning"
-      });
-      lightningTimer = Math.max(0.55, 1.8 - save.lightning * 0.13);
-      playTone(740, 0.05);
+      const lightningTarget = findRandomTarget();
+      if (lightningTarget) {
+        bullets.push({
+          x: center.x + 8, y: center.y - 12, target: lightningTarget,
+          speed: 470, damage: 15 + save.lightning * 8,
+          chainCount: 2 + save.lightning, chainRange: 92 + save.lightning * 12,
+          life: 2, weapon: "lightning"
+        });
+        lightningTimer = Math.max(0.55, 1.8 - save.lightning * 0.13);
+        playTone(740, 0.05);
+      }
     }
     if (save.blackHole > 0 && blackHoleTimer <= 0 && zombies.length >= 2) {
-      const cluster = findZombieCluster();
-      const radius = 115 + save.blackHole * 8;
-      effects.push({
-        type: "blackHole", x: cluster.x, y: cluster.y, radius,
-        level: save.blackHole, life: 2.3, maxLife: 2.3, pulse: 0
-      });
-      blackHoleTimer = Math.max(7, 15 - save.blackHole * 0.65);
-      playTone(135, 0.25);
+      const target = findRandomTarget();
+      if (target) {
+        const radius = 115 + save.blackHole * 8;
+        effects.push({
+          type: "blackHole", x: target.x, y: target.y, radius,
+          level: save.blackHole, life: 2.3, maxLife: 2.3, pulse: 0
+        });
+        blackHoleTimer = Math.max(7, 15 - save.blackHole * 0.65);
+        playTone(135, 0.25);
+      }
     }
     if (save.smoke > 0 && smokeTimer <= 0 && zombies.length > 0) {
-      const cluster = findZombieCluster();
-      const radius = 105 + save.smoke * 8;
-      let stunned = 0;
-      for (const zombie of zombies) {
-        if (zombie.dead || Math.hypot(zombie.x - cluster.x, zombie.y - cluster.y) > radius) continue;
-        zombie.stunTimer = Math.max(zombie.stunTimer, 1.5 + save.smoke * 0.35);
-        stunned++;
+      const target = findRandomTarget();
+      if (target) {
+        const radius = 105 + save.smoke * 8;
+        let stunned = 0;
+        for (const zombie of zombies) {
+          if (zombie.dead || Math.hypot(zombie.x - target.x, zombie.y - target.y) > radius) continue;
+          zombie.stunTimer = Math.max(zombie.stunTimer, 1.5 + save.smoke * 0.35);
+          stunned++;
+        }
+        effects.push({ type: "smoke", x: target.x, y: target.y, radius, life: 1.8, maxLife: 1.8 });
+        smokeTimer = Math.max(4.5, 9 - save.smoke * 0.35);
+        if (stunned) playTone(250, 0.16);
       }
-      effects.push({ type: "smoke", x: cluster.x, y: cluster.y, radius, life: 1.8, maxLife: 1.8 });
-      smokeTimer = Math.max(4.5, 9 - save.smoke * 0.35);
-      if (stunned) playTone(250, 0.16);
     }
 
     for (const zombie of zombies) {
@@ -394,26 +410,10 @@
     return nearest;
   }
 
-  function findZombieCluster() {
-    let best = zombies.find((zombie) => !zombie.dead) || { x: center.x, y: center.y };
-    let bestCount = -1;
-    for (const candidate of zombies) {
-      if (candidate.dead) continue;
-      let count = 0;
-      let sumX = 0;
-      let sumY = 0;
-      for (const zombie of zombies) {
-        if (zombie.dead || Math.hypot(zombie.x - candidate.x, zombie.y - candidate.y) > 115) continue;
-        count++;
-        sumX += zombie.x;
-        sumY += zombie.y;
-      }
-      if (count > bestCount) {
-        bestCount = count;
-        best = { x: sumX / count, y: sumY / count };
-      }
-    }
-    return best;
+  function findRandomTarget() {
+    const livingZombies = zombies.filter((zombie) => !zombie.dead);
+    if (livingZombies.length === 0) return null;
+    return livingZombies[Math.floor(Math.random() * livingZombies.length)];
   }
 
   function killZombie(zombie) {
