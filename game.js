@@ -85,7 +85,15 @@
   let lastTime = 0;
   let saveTimer = 0;
   let audioContext = null;
+  let masterGain = null;
+  let sfxGain = null;
+  let musicGain = null;
   let soundEnabled = false;
+  let musicEnabled = false;
+  let musicTimer = null;
+  let musicStep = 0;
+  let nextMusicTime = 0;
+  const lastSfxTime = new Map();
   let bannerTimer;
   let upgradeRenderKey = "";
   let gameSpeed = 1;
@@ -229,7 +237,7 @@
       } else {
         showBanner(`WAVE ${save.wave} · THE HORDE GROWS`);
       }
-      playTone(260, 0.14);
+      playSfx(save.wave % 5 === 0 ? "boss" : "wave");
     }
     if (save.wave % 5 === 0 && bossSpawnedWave !== save.wave && save.bossDefeatedWave !== save.wave) {
       spawnZombie("boss");
@@ -265,7 +273,7 @@
     if (target && shotTimer <= 0) {
       bullets.push({ x: center.x, y: center.y - 13, target, speed: 390, damage: damagePerShot(), life: 2, weapon: "house" });
       shotTimer = fireInterval();
-      playTone(430, 0.035);
+      playSfx("houseShot");
     }
     if (target && save.minigun > 0 && minigunTimer <= 0) {
       const minigunTarget = findRandomTarget();
@@ -274,6 +282,7 @@
           x: center.x + 22, y: center.y + 5, target: minigunTarget,
           speed: 540, damage: 3 + save.minigun * 2, life: 2, weapon: "minigun"
         });
+        playSfx("minigun");
         minigunTimer = Math.max(0.075, 0.24 - save.minigun * 0.025);
       }
     }
@@ -300,7 +309,7 @@
           color: "#71eaff", life: 0.16, maxLife: 0.16
         });
         laserTimer = Math.max(0.38, 1.35 - save.laser * 0.12);
-        playTone(780, 0.055);
+        playSfx("laser");
       }
     }
     if (target && save.rockets > 0 && rocketTimer <= 0) {
@@ -312,7 +321,7 @@
           weapon: "rocket", blastRadius: 52 + save.rockets * 3
         });
         rocketTimer = Math.max(0.65, 2.1 - save.rockets * 0.13);
-        playTone(190, 0.09);
+        playSfx("rocket");
       }
     }
     if (target && save.lightning > 0 && lightningTimer <= 0) {
@@ -325,7 +334,7 @@
           life: 2, weapon: "lightning"
         });
         lightningTimer = Math.max(0.55, 1.8 - save.lightning * 0.13);
-        playTone(740, 0.05);
+        playSfx("electric");
       }
     }
     if (save.blackHole > 0 && blackHoleTimer <= 0 && zombies.length >= 2) {
@@ -337,7 +346,7 @@
           level: save.blackHole, life: 2.3, maxLife: 2.3, pulse: 0
         });
         blackHoleTimer = Math.max(7, 15 - save.blackHole * 0.65);
-        playTone(135, 0.25);
+        playSfx("blackHole");
       }
     }
     if (save.smoke > 0 && smokeTimer <= 0 && zombies.length > 0) {
@@ -352,7 +361,7 @@
         }
         effects.push({ type: "smoke", x: target.x, y: target.y, radius, life: 1.8, maxLife: 1.8 });
         smokeTimer = Math.max(4.5, 9 - save.smoke * 0.35);
-        if (stunned) playTone(250, 0.16);
+        if (stunned) playSfx("smoke");
       }
     }
     if (target && save.sniper > 0 && sniperTimer <= 0) {
@@ -362,6 +371,7 @@
           x: center.x, y: center.y - 22, target: shotTarget, speed: 780,
           damage: 42 + save.sniper * 26, life: 2, weapon: "sniper"
         });
+        playSfx("sniper");
         sniperTimer = Math.max(0.65, 2.8 - save.sniper * 0.18);
       }
     }
@@ -376,6 +386,7 @@
           if (zombie.hp <= 0) killZombie(zombie);
         }
         effects.push({ type: "frost", x: frostTarget.x, y: frostTarget.y, radius, life: 0.55, maxLife: 0.55 });
+        playSfx("frost");
         frostTimer = Math.max(1.1, 3.6 - save.frost * 0.2);
       }
     }
@@ -388,6 +399,7 @@
           zombie.burnTimer = Math.max(zombie.burnTimer || 0, 2.5 + save.flamethrower * 0.35);
         }
         effects.push({ type: "flame", x: flameTarget.x, y: flameTarget.y, radius, life: 0.7, maxLife: 0.7 });
+        playSfx("flame");
         flameTimer = Math.max(0.8, 2.5 - save.flamethrower * 0.14);
       }
     }
@@ -399,6 +411,7 @@
           y: center.y - 45 - Math.random() * 35, target: droneTarget,
           speed: 500, damage: 8 + save.drones * 5, life: 2, weapon: "drone"
         });
+        playSfx("drone");
         droneTimer = Math.max(0.16, 0.62 - save.drones * 0.035);
       }
     }
@@ -410,6 +423,7 @@
           speed: 145, damage: 45 + save.mortar * 28, life: 4,
           weapon: "mortar", blastRadius: 76 + save.mortar * 8
         });
+        playSfx("mortar");
         mortarTimer = Math.max(1.8, 5.4 - save.mortar * 0.28);
       }
     }
@@ -430,6 +444,7 @@
           }
         }
         effects.push({ type: "beam", x1: start.x, y1: start.y, x2: railTarget.x, y2: railTarget.y, color: "#d6a4ff", life: 0.25, maxLife: 0.25 });
+        playSfx("railgun");
         railgunTimer = Math.max(1.1, 3.8 - save.railgun * 0.2);
       }
     }
@@ -446,6 +461,7 @@
         }
         effects.push({ type: "blast", x: strikeTarget.x, y: strikeTarget.y, radius, color: "#ffe17b", life: 0.55, maxLife: 0.55 });
         screenShake = Math.max(screenShake, 0.28);
+        playSfx("artillery");
         artilleryTimer = Math.max(3.2, 9 - save.artillery * 0.4);
       }
     }
@@ -518,6 +534,7 @@
       if (distance < bullet.speed * dt + bullet.target.radius) {
         bullet.dead = true;
         damageZombie(bullet.target, bullet.damage);
+        if (bullet.weapon === "house") playSfx("hit");
         effects.push({
           x: bullet.target.x, y: bullet.target.y - 8,
           text: `-${Math.round(bullet.damage)}`,
@@ -538,7 +555,7 @@
       bullets = [];
       $("#defeat-overlay").hidden = false;
       showBanner("THE HOUSE HAS FALLEN");
-      playTone(110, 0.35);
+      playSfx("defeat");
     }
 
     zombies = zombies.filter((zombie) => !zombie.dead);
@@ -584,18 +601,20 @@
       const bonus = 10 + Math.floor(save.wave / 2) * 2;
       save.coins += bonus;
       showBanner(`✦ ${killStreak} KILL STREAK · +${bonus} BONUS`);
+      playSfx("streak");
     }
     if (zombie.type === "boss") {
       save.bossDefeatedWave = save.wave;
       showBanner(`BOSS DOWN · +${reward} COINS`);
       screenShake = 0.5;
+      playSfx("bossKill");
     }
     for (let i = 0; i < (zombie.type === "boss" ? 32 : 9); i++) {
       const angle = Math.random() * Math.PI * 2;
       const speed = 18 + Math.random() * 54;
       effects.push({ x: zombie.x, y: zombie.y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, color: ["#b5c771", "#dd9878", "#b58a76"][zombie.tint], life: 0.4 + Math.random() * 0.45, maxLife: 0.8, size: 1.5 + Math.random() * 2 });
     }
-    playTone(zombie.type === "boss" ? 190 : 680, zombie.type === "boss" ? 0.24 : 0.045);
+    if (zombie.type !== "boss") playSfx("kill");
   }
 
   function damageZombie(zombie, damage) {
@@ -621,6 +640,7 @@
       color: rocket.weapon === "mortar" ? "#f3d982" : "#ffad58",
       life: 0.3, maxLife: 0.3
     });
+    playSfx(rocket.weapon === "mortar" ? "explosion" : "rocketImpact");
   }
 
   function chainLightning(projectile) {
@@ -647,7 +667,7 @@
       type: "lightning", x1: projectile.target.x, y1: projectile.target.y, segments,
       color: "#a9f6ff", life: 0.24, maxLife: 0.24
     });
-    playTone(900, 0.08);
+    playSfx("electric");
   }
 
   function updateBlackHole(effect, dt) {
@@ -1240,7 +1260,7 @@
     showBanner(`${upgrade.name.toUpperCase()} · UPGRADED`);
     persist();
     refreshUI();
-    playTone(600, 0.11);
+    playSfx("upgrade");
   }
 
   function showBanner(message) {
@@ -1264,19 +1284,136 @@
     refreshUI();
   }
 
+  function setupAudio() {
+    if (audioContext) return;
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextClass) throw new Error("Web Audio is not supported in this browser.");
+    audioContext = new AudioContextClass();
+    masterGain = audioContext.createGain();
+    sfxGain = audioContext.createGain();
+    musicGain = audioContext.createGain();
+    masterGain.gain.value = 0.8;
+    sfxGain.gain.value = 0.75;
+    musicGain.gain.value = 0.0001;
+    sfxGain.connect(masterGain);
+    musicGain.connect(masterGain);
+    masterGain.connect(audioContext.destination);
+  }
+
   function playTone(frequency, duration) {
-    if (!soundEnabled) return;
-    audioContext ||= new AudioContext();
+    if (!soundEnabled || !audioContext || audioContext.state !== "running") return;
+    const start = audioContext.currentTime;
     const oscillator = audioContext.createOscillator();
     const gain = audioContext.createGain();
     oscillator.type = "triangle";
-    oscillator.frequency.value = frequency;
-    gain.gain.setValueAtTime(0.025, audioContext.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + duration);
+    oscillator.frequency.setValueAtTime(frequency, start);
+    gain.gain.setValueAtTime(0.0001, start);
+    gain.gain.exponentialRampToValueAtTime(0.035, start + 0.012);
+    gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
     oscillator.connect(gain);
-    gain.connect(audioContext.destination);
+    gain.connect(sfxGain);
     oscillator.start();
-    oscillator.stop(audioContext.currentTime + duration);
+    oscillator.stop(start + duration + 0.02);
+  }
+
+  function playSfx(name) {
+    if (!soundEnabled || !audioContext || audioContext.state !== "running") return;
+    const now = audioContext.currentTime;
+    const previous = lastSfxTime.get(name) || -Infinity;
+    const minimumGap = name === "drone" ? 0.1 : name === "kill" ? 0.12 : name === "minigun" ? 0.1 : 0.035;
+    if (now - previous < minimumGap) return;
+    lastSfxTime.set(name, now);
+    const sounds = {
+      houseShot: [220, 105, 0.08, "square", 0.035],
+      minigun: [170, 95, 0.055, "square", 0.018],
+      hit: [540, 300, 0.055, "triangle", 0.018],
+      laser: [980, 420, 0.19, "sawtooth", 0.045],
+      rocket: [125, 58, 0.3, "sawtooth", 0.06],
+      rocketImpact: [82, 38, 0.28, "triangle", 0.07],
+      explosion: [68, 28, 0.48, "sawtooth", 0.085],
+      electric: [720, 1200, 0.16, "sawtooth", 0.04],
+      blackHole: [95, 32, 0.55, "sine", 0.06],
+      smoke: [310, 145, 0.24, "triangle", 0.045],
+      sniper: [820, 170, 0.14, "square", 0.055],
+      frost: [560, 1180, 0.3, "sine", 0.045],
+      flame: [115, 75, 0.22, "sawtooth", 0.035],
+      drone: [390, 240, 0.075, "square", 0.018],
+      mortar: [150, 75, 0.34, "triangle", 0.05],
+      railgun: [240, 1450, 0.3, "sawtooth", 0.055],
+      artillery: [75, 30, 0.65, "sawtooth", 0.09],
+      kill: [620, 390, 0.09, "triangle", 0.025],
+      streak: [660, 990, 0.28, "triangle", 0.045],
+      boss: [145, 72, 0.65, "sawtooth", 0.08],
+      bossKill: [190, 760, 0.5, "triangle", 0.065],
+      defeat: [165, 42, 0.8, "sawtooth", 0.08],
+      wave: [290, 520, 0.2, "triangle", 0.035],
+      upgrade: [420, 880, 0.18, "triangle", 0.04]
+    };
+    const [from, to, duration, type, volume] = sounds[name] || [440, 0, 0.1, "triangle", 0.025];
+    const oscillator = audioContext.createOscillator();
+    const envelope = audioContext.createGain();
+    oscillator.type = type;
+    oscillator.frequency.setValueAtTime(from, now);
+    if (to) oscillator.frequency.exponentialRampToValueAtTime(Math.max(1, to), now + duration);
+    envelope.gain.setValueAtTime(0.0001, now);
+    envelope.gain.exponentialRampToValueAtTime(volume, now + 0.008);
+    envelope.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+    oscillator.connect(envelope);
+    envelope.connect(sfxGain);
+    oscillator.start(now);
+    oscillator.stop(now + duration + 0.02);
+  }
+
+  function playMusicNote(frequency, start, duration, volume, type) {
+    const oscillator = audioContext.createOscillator();
+    const envelope = audioContext.createGain();
+    const filter = audioContext.createBiquadFilter();
+    oscillator.type = type;
+    oscillator.frequency.setValueAtTime(frequency, start);
+    filter.type = "lowpass";
+    filter.frequency.setValueAtTime(type === "sine" ? 620 : 1450, start);
+    envelope.gain.setValueAtTime(0.0001, start);
+    envelope.gain.linearRampToValueAtTime(volume, start + 0.12);
+    envelope.gain.setValueAtTime(volume, start + duration * 0.65);
+    envelope.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+    oscillator.connect(filter);
+    filter.connect(envelope);
+    envelope.connect(musicGain);
+    oscillator.start(start);
+    oscillator.stop(start + duration + 0.02);
+  }
+
+  function scheduleMusic() {
+    if (!musicEnabled || !audioContext || audioContext.state !== "running") return;
+    const beat = 60 / 78;
+    const notes = [110, 0, 164.81, 0, 146.83, 0, 196, 0, 130.81, 0, 164.81, 0, 98, 0, 146.83, 0];
+    while (nextMusicTime < audioContext.currentTime + 0.16) {
+      const step = musicStep % notes.length;
+      const bass = notes[step];
+      if (step % 4 === 0) {
+        playMusicNote(bass, nextMusicTime, beat * 3.8, 0.085, "sine");
+        playMusicNote(bass * 2, nextMusicTime, beat * 2.8, 0.018, "triangle");
+      }
+      if (step % 2 === 0) {
+        const melody = [220, 0, 246.94, 0, 196, 0, 164.81, 0, 220, 0, 293.66, 0, 246.94, 0, 196, 0][step];
+        if (melody) playMusicNote(melody, nextMusicTime, beat * 1.75, 0.035, "triangle");
+      }
+      musicStep++;
+      nextMusicTime += beat / 2;
+    }
+  }
+
+  function startMusic() {
+    if (!musicEnabled || musicTimer !== null) return;
+    nextMusicTime = audioContext.currentTime + 0.04;
+    musicTimer = window.setInterval(scheduleMusic, 100);
+  }
+
+  function stopMusic() {
+    if (musicTimer !== null) {
+      window.clearInterval(musicTimer);
+      musicTimer = null;
+    }
   }
 
   function loop(now) {
@@ -1294,18 +1431,53 @@
     refreshUI();
   });
   $("#sound-button").addEventListener("click", async (event) => {
-    soundEnabled = !soundEnabled;
-    event.currentTarget.classList.toggle("muted", !soundEnabled);
-    event.currentTarget.setAttribute("aria-label", soundEnabled ? "Mute sound" : "Enable sound");
-    if (soundEnabled) {
-      audioContext ||= new AudioContext();
+    try {
+      setupAudio();
       await audioContext.resume();
-      playTone(520, 0.08);
+      soundEnabled = !soundEnabled;
+      event.currentTarget.classList.toggle("muted", !soundEnabled);
+      event.currentTarget.textContent = soundEnabled ? "SFX ON" : "SFX OFF";
+      event.currentTarget.setAttribute("aria-label", soundEnabled ? "Mute sound effects" : "Enable sound effects");
+      event.currentTarget.title = soundEnabled ? "Mute sound effects" : "Enable sound effects";
+      if (soundEnabled) playTone(520, 0.08);
+    } catch (error) {
+      console.error("Could not enable sound effects.", error);
+      showBanner("AUDIO UNAVAILABLE IN THIS BROWSER");
+    }
+  });
+  $("#music-button").addEventListener("click", async (event) => {
+    try {
+      setupAudio();
+      await audioContext.resume();
+      musicEnabled = !musicEnabled;
+      event.currentTarget.classList.toggle("muted", !musicEnabled);
+      event.currentTarget.textContent = musicEnabled ? "MUSIC ON" : "MUSIC OFF";
+      event.currentTarget.setAttribute("aria-label", musicEnabled ? "Turn background music off" : "Enable background music");
+      event.currentTarget.title = musicEnabled ? "Turn background music off" : "Enable background music";
+      const now = audioContext.currentTime;
+      musicGain.gain.cancelScheduledValues(now);
+      musicGain.gain.setTargetAtTime(musicEnabled ? 0.24 : 0.0001, now, 0.12);
+      if (musicEnabled) startMusic();
+      else stopMusic();
+    } catch (error) {
+      console.error("Could not enable background music.", error);
+      showBanner("AUDIO UNAVAILABLE IN THIS BROWSER");
     }
   });
   window.addEventListener("resize", resizeCanvas);
   window.addEventListener("beforeunload", persist);
-  document.addEventListener("visibilitychange", () => { if (document.hidden) persist(); });
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) {
+      persist();
+      stopMusic();
+      if (musicGain && audioContext) musicGain.gain.setTargetAtTime(0.0001, audioContext.currentTime, 0.08);
+    } else if (musicEnabled && audioContext) {
+      audioContext.resume().then(() => {
+        musicGain.gain.setTargetAtTime(0.24, audioContext.currentTime, 0.15);
+        startMusic();
+      }).catch((error) => console.error("Could not resume background music.", error));
+    }
+  });
 
   initializeField();
   resizeCanvas();

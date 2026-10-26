@@ -32,8 +32,9 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--lime); outline-
 }
 .status-pill { display: flex; align-items: center; gap: 8px; color: #9ba38e; font-size: 9px; }
 .status-pill i { width: 6px; height: 6px; border-radius: 50%; background: var(--lime); box-shadow: 0 0 9px rgba(196, 229, 120, .7); }
-.sound-button { width: 35px; height: 35px; border: 1px solid var(--line); border-radius: 8px; background: #171e18; color: #d6ddc8; cursor: pointer; }
+.sound-button { min-width: 54px; height: 35px; padding: 0 8px; border: 1px solid var(--line); border-radius: 8px; background: #171e18; color: #d6ddc8; font: 7px "DM Mono", monospace; letter-spacing: .06em; cursor: pointer; }
 .sound-button.muted { color: #697361; }
+.music-button { min-width: 76px; }
 .game-layout { display: grid; grid-template-columns: minmax(0, 1fr) 344px; gap: 15px; padding: 20px 0 14px; align-items: start; }
 .battle-panel, .upgrade-panel { overflow: hidden; border: 1px solid rgba(190, 205, 158, .16); border-radius: 12px; background: #171e18; box-shadow: 0 18px 55px rgba(0, 0, 0, .22); }
 .battle-panel { display: flex; min-width: 0; flex-direction: column; }
@@ -139,6 +140,8 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--lime); outline-
   .status-pill { font-size: 0; }
   .status-pill i { width: 7px; height: 7px; }
   .topbar-right { gap: 9px; }
+  .sound-button { min-width: 48px; height: 31px; padding: 0 5px; font-size: 6px; }
+  .music-button { min-width: 66px; }
   .game-layout { gap: 10px; padding-top: 10px; }
   .battle-top { min-height: 62px; gap: 8px; padding: 9px; }
   .wave-label > strong { font-size: 16px; }
@@ -157,4 +160,9 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--lime); outline-
   .upgrade-list { grid-template-columns: 1fr; gap: 7px; }
   .upgrade-card { padding: 9px; }
   .footer { gap: 8px; font-size: 6px; }
+}
+@media (max-width: 380px) {
+  .topbar-right { gap: 6px; }
+  .sound-button { min-width: 42px; padding: 0 4px; font-size: 5px; }
+  .music-button { min-width: 60px; }
 }
