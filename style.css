@@ -76,10 +76,11 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--lime); outline-
 .level-bars { display: flex; gap: 3px; margin-left: auto; }
 .level-bars i { width: 5px; height: 19px; border-radius: 2px; background: #384332; transform: skew(-12deg); }
 .level-bars i.active { background: var(--lime); box-shadow: 0 0 7px rgba(196, 229, 120, .27); }
-.upgrade-list { display: grid; gap: 8px; margin-top: 12px; }
+.upgrade-list { display: grid; gap: 8px; max-height: min(660px, 72vh); overflow-y: auto; margin-top: 12px; padding-right: 3px; scrollbar-color: #5f7146 #171e18; scrollbar-width: thin; }
 .upgrade-section-label { grid-column: 1 / -1; margin: 6px 2px -2px; color: #c3b682; font: 8px "DM Mono", monospace; letter-spacing: .12em; }
 .upgrade-card { padding: 10px; border: 1px solid rgba(190, 205, 158, .12); border-radius: 8px; background: rgba(12, 17, 13, .38); transition: border-color .2s, transform .2s; }
 .upgrade-card.weapon-unlocked { border-color: rgba(123, 203, 202, .28); background: linear-gradient(100deg, rgba(51, 111, 103, .13), rgba(12, 17, 13, .38)); }
+.upgrade-card.control-unlocked { border-color: rgba(178, 139, 230, .3); background: linear-gradient(100deg, rgba(106, 71, 142, .13), rgba(12, 17, 13, .38)); }
 .upgrade-card:hover { border-color: rgba(196, 229, 120, .3); transform: translateY(-1px); }
 .upgrade-card-top { display: flex; align-items: center; gap: 9px; }
 .upgrade-icon { display: grid; width: 31px; height: 31px; flex: 0 0 31px; place-items: center; border: 1px solid rgba(190, 205, 158, .12); border-radius: 7px; background: #20291e; color: #d6dcbd; font-size: 17px; }
@@ -105,13 +106,15 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--lime); outline-
 .primary-button { width: 100%; min-height: 40px; border: 1px solid rgba(213, 236, 158, .56); border-radius: 6px; background: linear-gradient(100deg, #819b4f, #5f7940); color: #f3f5e8; font-size: 9px; font-weight: 700; letter-spacing: .08em; cursor: pointer; }
 .primary-button:hover { filter: brightness(1.1); }
 
+.upgrade-section-label.control-label { margin-top: 5px; color: #b8a4d5; }
+
 @media (min-width: 1150px) { .field-wrap { min-height: 470px; } }
 @media (max-width: 900px) {
   .app { width: min(100% - 28px, 700px); }
   .game-layout { grid-template-columns: 1fr; }
   .field-wrap { min-height: min(52vw, 430px); }
   .upgrade-panel { min-height: 0; }
-  .upgrade-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .upgrade-list { max-height: none; overflow: visible; grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .upgrade-foot { margin-top: 13px; }
 }
 @media (max-width: 540px) {

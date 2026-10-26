@@ -16,7 +16,11 @@
     { id: "income", name: "Supply Shed", icon: "✦", description: "Earn coins even while the game is idle.", baseCost: 30, costScale: 1.6 },
     { id: "minigun", name: "Minigun Nest", icon: "⤠", description: "Unlock a rapid-fire turret; upgrades boost damage and speed.", baseCost: 90, costScale: 1.72 },
     { id: "laser", name: "Laser Array", icon: "⌁", description: "Unlock a piercing laser; upgrades boost damage and recharge speed.", baseCost: 160, costScale: 1.78 },
-    { id: "rockets", name: "Rocket Silo", icon: "➤", description: "Unlock explosive rockets; upgrades boost blast damage.", baseCost: 240, costScale: 1.82 }
+    { id: "rockets", name: "Rocket Silo", icon: "➤", description: "Unlock explosive rockets; upgrades boost blast damage.", baseCost: 240, costScale: 1.82 },
+    { id: "lightning", name: "Storm Coil", icon: "ϟ", description: "Chain lightning jumps from its target to nearby zombies.", baseCost: 280, costScale: 1.82 },
+    { id: "thorns", name: "Thorn Field", icon: "♧", description: "A thorny perimeter slows zombies near the house.", baseCost: 170, costScale: 1.72 },
+    { id: "blackHole", name: "Black Hole", icon: "◉", description: "Pulls in and damages a group. Long recharge.", baseCost: 420, costScale: 1.9 },
+    { id: "smoke", name: "Smoke Bomb", icon: "☁", description: "Stuns a group of zombies in a cloud of smoke.", baseCost: 330, costScale: 1.84 }
   ];
   const freshSave = () => ({
     coins: 40,
@@ -33,6 +37,10 @@
     minigun: 0,
     laser: 0,
     rockets: 0,
+    lightning: 0,
+    thorns: 0,
+    blackHole: 0,
+    smoke: 0,
     health: 250,
     savedAt: Date.now()
   });
@@ -48,6 +56,9 @@
   let minigunTimer = 0;
   let laserTimer = 0;
   let rocketTimer = 0;
+  let lightningTimer = 0;
+  let blackHoleTimer = 0;
+  let smokeTimer = 0;
   let gameState = save.health > 0 ? "playing" : "defeated";
   let lastTime = 0;
   let saveTimer = 0;
@@ -157,7 +168,7 @@
       x, y, hp, maxHp: hp, speed: 12 + Math.min(save.wave * 0.35, 9) + Math.random() * 2,
       radius: 8 + Math.random() * 3, attackTimer: Math.random() * 0.5,
       tint: Math.floor(Math.random() * 3), wobble: Math.random() * Math.PI * 2,
-      dead: false
+      slowTimer: 0, stunTimer: 0, dead: false
     });
   }
 
@@ -191,6 +202,9 @@
     minigunTimer -= dt;
     laserTimer -= dt;
     rocketTimer -= dt;
+    lightningTimer -= dt;
+    blackHoleTimer -= dt;
+    smokeTimer -= dt;
     const target = findTarget();
     if (target && shotTimer <= 0) {
       bullets.push({ x: center.x, y: center.y - 13, target, speed: 390, damage: damagePerShot(), life: 2, weapon: "house" });
@@ -236,15 +250,55 @@
       rocketTimer = Math.max(0.65, 2.1 - save.rockets * 0.13);
       playTone(190, 0.09);
     }
+    if (target && save.lightning > 0 && lightningTimer <= 0) {
+      bullets.push({
+        x: center.x + 8, y: center.y - 12, target,
+        speed: 470, damage: 15 + save.lightning * 8,
+        chainCount: 2 + save.lightning, chainRange: 92 + save.lightning * 12,
+        life: 2, weapon: "lightning"
+      });
+      lightningTimer = Math.max(0.55, 1.8 - save.lightning * 0.13);
+      playTone(740, 0.05);
+    }
+    if (save.blackHole > 0 && blackHoleTimer <= 0 && zombies.length >= 2) {
+      const cluster = findZombieCluster();
+      const radius = 115 + save.blackHole * 8;
+      effects.push({
+        type: "blackHole", x: cluster.x, y: cluster.y, radius,
+        level: save.blackHole, life: 2.3, maxLife: 2.3, pulse: 0
+      });
+      blackHoleTimer = Math.max(7, 15 - save.blackHole * 0.65);
+      playTone(135, 0.25);
+    }
+    if (save.smoke > 0 && smokeTimer <= 0 && zombies.length > 0) {
+      const cluster = findZombieCluster();
+      const radius = 105 + save.smoke * 8;
+      let stunned = 0;
+      for (const zombie of zombies) {
+        if (zombie.dead || Math.hypot(zombie.x - cluster.x, zombie.y - cluster.y) > radius) continue;
+        zombie.stunTimer = Math.max(zombie.stunTimer, 1.5 + save.smoke * 0.35);
+        stunned++;
+      }
+      effects.push({ type: "smoke", x: cluster.x, y: cluster.y, radius, life: 1.8, maxLife: 1.8 });
+      smokeTimer = Math.max(4.5, 9 - save.smoke * 0.35);
+      if (stunned) playTone(250, 0.16);
+    }
 
     for (const zombie of zombies) {
+      zombie.slowTimer = Math.max(0, zombie.slowTimer - dt);
+      zombie.stunTimer = Math.max(0, zombie.stunTimer - dt);
       const dx = center.x - zombie.x;
       const dy = center.y - zombie.y;
       const distance = Math.hypot(dx, dy);
       const houseRadius = 48 + (save.houseLevel - 1) * 2;
-      if (distance > houseRadius + zombie.radius) {
-        zombie.x += dx / distance * zombie.speed * dt;
-        zombie.y += dy / distance * zombie.speed * dt;
+      const thornRadius = 160 + save.thorns * 10;
+      if (save.thorns > 0 && distance < thornRadius) zombie.slowTimer = Math.max(zombie.slowTimer, 0.15);
+      if (zombie.stunTimer > 0) {
+        zombie.wobble += dt * 2;
+      } else if (distance > houseRadius + zombie.radius) {
+        const speedFactor = zombie.slowTimer > 0 ? Math.max(0.35, 0.65 - save.thorns * 0.04) : 1;
+        zombie.x += dx / distance * zombie.speed * speedFactor * dt;
+        zombie.y += dy / distance * zombie.speed * speedFactor * dt;
       } else {
         zombie.attackTimer -= dt;
         if (zombie.attackTimer <= 0) {
@@ -270,19 +324,35 @@
       const dx = bullet.target.x - bullet.x;
       const dy = bullet.target.y - bullet.y;
       const distance = Math.hypot(dx, dy);
-      if (distance < bullet.speed * dt + bullet.target.radius) {
-        bullet.dead = true;
-        if (bullet.weapon === "rocket") {
+      if (bullet.weapon === "rocket") {
+        if (distance < bullet.speed * dt + bullet.target.radius) {
+          bullet.dead = true;
           detonateRocket(bullet);
         } else {
-          damageZombie(bullet.target, bullet.damage);
-          effects.push({
-            x: bullet.target.x, y: bullet.target.y - 8,
-            text: `-${Math.round(bullet.damage)}`,
-            color: bullet.weapon === "minigun" ? "#ffd278" : "#f2da9e",
-            life: 0.55, maxLife: 0.55
-          });
+          bullet.x += dx / distance * bullet.speed * dt;
+          bullet.y += dy / distance * bullet.speed * dt;
         }
+        continue;
+      }
+      if (bullet.weapon === "lightning") {
+        if (distance < bullet.speed * dt + bullet.target.radius) {
+          bullet.dead = true;
+          chainLightning(bullet);
+        } else {
+          bullet.x += dx / distance * bullet.speed * dt;
+          bullet.y += dy / distance * bullet.speed * dt;
+        }
+        continue;
+      }
+      if (distance < bullet.speed * dt + bullet.target.radius) {
+        bullet.dead = true;
+        damageZombie(bullet.target, bullet.damage);
+        effects.push({
+          x: bullet.target.x, y: bullet.target.y - 8,
+          text: `-${Math.round(bullet.damage)}`,
+          color: bullet.weapon === "minigun" ? "#ffd278" : "#f2da9e",
+          life: 0.55, maxLife: 0.55
+        });
       } else {
         bullet.x += dx / distance * bullet.speed * dt;
         bullet.y += dy / distance * bullet.speed * dt;
@@ -324,6 +394,28 @@
     return nearest;
   }
 
+  function findZombieCluster() {
+    let best = zombies.find((zombie) => !zombie.dead) || { x: center.x, y: center.y };
+    let bestCount = -1;
+    for (const candidate of zombies) {
+      if (candidate.dead) continue;
+      let count = 0;
+      let sumX = 0;
+      let sumY = 0;
+      for (const zombie of zombies) {
+        if (zombie.dead || Math.hypot(zombie.x - candidate.x, zombie.y - candidate.y) > 115) continue;
+        count++;
+        sumX += zombie.x;
+        sumY += zombie.y;
+      }
+      if (count > bestCount) {
+        bestCount = count;
+        best = { x: sumX / count, y: sumY / count };
+      }
+    }
+    return best;
+  }
+
   function killZombie(zombie) {
     if (zombie.dead) return;
     zombie.dead = true;
@@ -358,8 +450,55 @@
     effects.push({ type: "blast", x, y, radius, color: "#ffad58", life: 0.3, maxLife: 0.3 });
   }
 
+  function chainLightning(projectile) {
+    let current = projectile.target;
+    const chained = new Set();
+    const segments = [];
+    for (let i = 0; i < projectile.chainCount && current; i++) {
+      chained.add(current);
+      segments.push({ x: current.x, y: current.y });
+      damageZombie(current, projectile.damage);
+      let nearest = null;
+      let nearestDistance = projectile.chainRange;
+      for (const candidate of zombies) {
+        if (candidate.dead || chained.has(candidate)) continue;
+        const distance = Math.hypot(candidate.x - current.x, candidate.y - current.y);
+        if (distance < nearestDistance) {
+          nearest = candidate;
+          nearestDistance = distance;
+        }
+      }
+      current = nearest;
+    }
+    effects.push({
+      type: "lightning", x1: projectile.target.x, y1: projectile.target.y, segments,
+      color: "#a9f6ff", life: 0.24, maxLife: 0.24
+    });
+    playTone(900, 0.08);
+  }
+
+  function updateBlackHole(effect, dt) {
+    effect.pulse += dt;
+    if (effect.pulse < 0.25) return;
+    effect.pulse = 0;
+    for (const zombie of zombies) {
+      if (zombie.dead) continue;
+      const dx = effect.x - zombie.x;
+      const dy = effect.y - zombie.y;
+      const distance = Math.hypot(dx, dy);
+      if (distance >= effect.radius) continue;
+      const pull = Math.min(26, 7 + (effect.radius - distance) * 0.12) * dt;
+      if (distance > 2) {
+        zombie.x += dx / distance * pull;
+        zombie.y += dy / distance * pull;
+      }
+      damageZombie(zombie, 3 + effect.level * 2);
+    }
+  }
+
   function updateEffects(dt) {
     for (const effect of effects) {
+      if (effect.type === "blackHole") updateBlackHole(effect, dt);
       effect.life -= dt;
       if (effect.vx !== undefined) {
         effect.x += effect.vx * dt;
@@ -403,6 +542,7 @@
     ctx.beginPath();
     ctx.ellipse(center.x, center.y, 155, 116, 0, 0, Math.PI * 2);
     ctx.fill();
+    drawThornField();
     for (const tree of trees) drawTree(tree);
     drawHouse();
     for (const zombie of zombies) drawZombie(zombie);
@@ -424,6 +564,33 @@
     ctx.beginPath(); ctx.arc(-7, -30, 11, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = "rgba(173, 196, 112, .27)";
     ctx.beginPath(); ctx.arc(-9, -35, 4, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+
+  function drawThornField() {
+    if (save.thorns <= 0) return;
+    const radius = 160 + save.thorns * 10;
+    ctx.save();
+    ctx.strokeStyle = "rgba(175, 217, 112, .55)";
+    ctx.lineWidth = 2;
+    ctx.setLineDash([5, 8]);
+    ctx.beginPath();
+    ctx.arc(center.x, center.y, radius, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    for (let i = 0; i < 24; i++) {
+      const angle = i / 24 * Math.PI * 2;
+      const x = center.x + Math.cos(angle) * radius;
+      const y = center.y + Math.sin(angle) * radius;
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(angle);
+      ctx.fillStyle = "#b8d779";
+      ctx.beginPath();
+      ctx.moveTo(-4, 0); ctx.lineTo(0, -8); ctx.lineTo(4, 0); ctx.lineTo(0, -2); ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
     ctx.restore();
   }
 
@@ -498,6 +665,17 @@
     ctx.beginPath(); ctx.arc(0, -zombie.radius * 0.68 + bob, zombie.radius * 0.62, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = "#dcdeba";
     ctx.beginPath(); ctx.arc(-3, -zombie.radius * 0.76 + bob, 1.4, 0, Math.PI * 2); ctx.arc(3, -zombie.radius * 0.76 + bob, 1.4, 0, Math.PI * 2); ctx.fill();
+    if (zombie.stunTimer > 0) {
+      ctx.fillStyle = "#edf1b0";
+      ctx.font = "bold 12px sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("✦", 0, -zombie.radius * 1.5 + bob);
+    }
+    if (zombie.slowTimer > 0) {
+      ctx.strokeStyle = "rgba(190, 225, 126, .8)";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(0, 0, zombie.radius + 3, 0, Math.PI * 2); ctx.stroke();
+    }
     ctx.restore();
     if (zombie.hp < zombie.maxHp) {
       const width = zombie.radius * 2;
@@ -511,7 +689,7 @@
   function drawBullet(bullet) {
     ctx.save();
     const rocket = bullet.weapon === "rocket";
-    const color = rocket ? "#ff9b54" : bullet.weapon === "minigun" ? "#ffd278" : "#ffe294";
+    const color = rocket ? "#ff9b54" : bullet.weapon === "minigun" ? "#ffd278" : bullet.weapon === "lightning" ? "#a9f6ff" : "#ffe294";
     ctx.shadowColor = color;
     ctx.shadowBlur = rocket ? 12 : 9;
     ctx.fillStyle = color;
@@ -533,7 +711,59 @@
     for (const effect of effects) {
       const alpha = Math.max(0, effect.life / effect.maxLife);
       ctx.globalAlpha = alpha;
-      if (effect.type === "beam") {
+      if (effect.type === "lightning") {
+        ctx.save();
+        ctx.strokeStyle = effect.color;
+        ctx.lineWidth = 3;
+        ctx.shadowColor = effect.color;
+        ctx.shadowBlur = 12;
+        let previous = { x: effect.x1, y: effect.y1 };
+        for (const segment of effect.segments) {
+          let x = previous.x;
+          let y = previous.y;
+          const steps = Math.max(2, Math.ceil(Math.hypot(segment.x - x, segment.y - y) / 25));
+          ctx.beginPath();
+          ctx.moveTo(x, y);
+          for (let i = 1; i < steps; i++) {
+            const t = i / steps;
+            x = previous.x + (segment.x - previous.x) * t + (Math.random() - 0.5) * 14;
+            y = previous.y + (segment.y - previous.y) * t + (Math.random() - 0.5) * 14;
+            ctx.lineTo(x, y);
+          }
+          ctx.lineTo(segment.x, segment.y);
+          ctx.stroke();
+          ctx.beginPath(); ctx.arc(segment.x, segment.y, 5, 0, Math.PI * 2); ctx.stroke();
+          previous = segment;
+        }
+        ctx.restore();
+      } else if (effect.type === "blackHole") {
+        const pulse = 0.85 + Math.sin((effect.maxLife - effect.life) * 12) * 0.1;
+        ctx.save();
+        ctx.fillStyle = "rgba(21, 10, 38, .22)";
+        ctx.beginPath(); ctx.arc(effect.x, effect.y, effect.radius, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = "#8c66d2";
+        ctx.lineWidth = 3;
+        ctx.shadowColor = "#744ac5";
+        ctx.shadowBlur = 19;
+        ctx.beginPath(); ctx.arc(effect.x, effect.y, 20 * pulse, 0, Math.PI * 2); ctx.stroke();
+        ctx.strokeStyle = "rgba(193, 159, 255, .75)";
+        ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.ellipse(effect.x, effect.y, 30 * pulse, 11 * pulse, 0.5, 0, Math.PI * 2); ctx.stroke();
+        ctx.restore();
+      } else if (effect.type === "smoke") {
+        ctx.save();
+        ctx.fillStyle = `rgba(172, 182, 179, ${0.24 * alpha})`;
+        ctx.beginPath(); ctx.arc(effect.x, effect.y, effect.radius * (1.15 - alpha * 0.15), 0, Math.PI * 2); ctx.fill();
+        for (let i = 0; i < 7; i++) {
+          const angle = i / 7 * Math.PI * 2 + (effect.maxLife - effect.life) * 0.4;
+          const radius = effect.radius * (0.3 + (i % 3) * 0.14);
+          ctx.fillStyle = `rgba(207, 213, 199, ${0.12 * alpha})`;
+          ctx.beginPath();
+          ctx.arc(effect.x + Math.cos(angle) * radius, effect.y + Math.sin(angle) * radius, 17 + i % 4 * 5, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.restore();
+      } else if (effect.type === "beam") {
         ctx.save();
         ctx.strokeStyle = effect.color;
         ctx.lineWidth = 5 * alpha + 1;
@@ -591,16 +821,16 @@
     const list = $("#upgrade-list");
     list.replaceChildren();
     for (const upgrade of upgrades) {
-      if (upgrade.id === "minigun") {
+      if (upgrade.id === "minigun" || upgrade.id === "lightning") {
         const heading = document.createElement("div");
-        heading.className = "upgrade-section-label";
-        heading.textContent = "AUTOMATIC WEAPON SYSTEMS";
+        heading.className = `upgrade-section-label${upgrade.id === "lightning" ? " control-label" : ""}`;
+        heading.textContent = upgrade.id === "minigun" ? "AUTOMATIC WEAPON SYSTEMS" : "FIELD CONTROL & CROWD CONTROL";
         list.append(heading);
       }
       const level = levelOf(upgrade.id);
       const cost = costOf(upgrade);
       const card = document.createElement("article");
-      card.className = `upgrade-card${level > 0 && ["minigun", "laser", "rockets"].includes(upgrade.id) ? " weapon-unlocked" : ""}`;
+      card.className = `upgrade-card${level > 0 && ["minigun", "laser", "rockets"].includes(upgrade.id) ? " weapon-unlocked" : ""}${level > 0 && ["lightning", "thorns", "blackHole", "smoke"].includes(upgrade.id) ? " control-unlocked" : ""}`;
       card.dataset.upgrade = upgrade.id;
       card.innerHTML = `
         <div class="upgrade-card-top">
@@ -627,6 +857,10 @@
       case "minigun": return save.minigun === 0 ? "Buy to unlock an automatic rapid-fire turret." : `${3 + save.minigun * 2} damage · fires every ${Math.max(0.075, 0.24 - save.minigun * 0.025).toFixed(2)}s`;
       case "laser": return save.laser === 0 ? "Buy to unlock an automatic piercing laser." : `${17 + save.laser * 12} line damage · recharges in ${Math.max(0.38, 1.35 - save.laser * 0.12).toFixed(2)}s`;
       case "rockets": return save.rockets === 0 ? "Buy to unlock explosive area-damage rockets." : `${15 + save.rockets * 12} blast damage · ${52 + save.rockets * 3}px radius`;
+      case "lightning": return save.lightning === 0 ? "Unlock electricity that chains across nearby zombies." : `${15 + save.lightning * 8} damage · jumps to ${2 + save.lightning} zombies`;
+      case "thorns": return save.thorns === 0 ? "Buy to surround the home with a zombie-slowing field." : `Slows zombies in a ${160 + save.thorns * 10}px radius`;
+      case "blackHole": return save.blackHole === 0 ? "Unlock a long-recharge gravity well that pulls and damages groups." : `${3 + save.blackHole * 2} pulse damage · ${Math.max(7, 15 - save.blackHole * 0.65).toFixed(1)}s recharge`;
+      case "smoke": return save.smoke === 0 ? "Unlock a smoke bomb that stuns groups of zombies." : `Stuns for ${(1.5 + save.smoke * 0.35).toFixed(2)}s · ${Math.max(4.5, 9 - save.smoke * 0.35).toFixed(1)}s recharge`;
       default: return "";
     }
   }
